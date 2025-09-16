@@ -1,17 +1,27 @@
+import sys
+
+sys.path.append(".")
+
 import asyncio
 from os import getenv
 from dotenv import load_dotenv
 
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Bot, Dispatcher, F
 from aiogram.fsm.storage.memory import MemoryStorage
 from fastapi import WebSocket
 
-from fastbot.engine import TemplateEngine
 from fastbot.engine import ContextEngine
+from fastbot.engine import TemplateEngine
 
 from fastbot import FastBotBuilder, MiniAppConfig
 from fastbot.logger import Logger
+
+import services
+import models
+import resolvers
+import middleware
+import handlers
 
 load_dotenv()
 
@@ -33,7 +43,7 @@ async def main() -> None:
     storage = MemoryStorage()
 
     template_service = TemplateEngine(
-        template_dirs=["templates", "src/owl_middleware/templates"]
+        template_dirs=["templates", "owl_middleware/templates"]
     )
     context_service = ContextEngine()
 
@@ -50,11 +60,27 @@ async def main() -> None:
         FastBotBuilder()
         .set_bot(Bot(token=getenv("BOT_TOKEN")))
         .set_dispatcher(Dispatcher(storage=storage))
+        # .add_middleware(middleware.logger)
+        # .add_middleware(middleware.error)
         .add_mini_app(mini_app_config)
     )
 
-    bot_builder.add_dependency(template_service)
-    bot_builder.add_dependency(context_service)
+    database_service = services.DBService(getenv("MONGO_URI"), getenv("DATABASE_NAME"))
+    auth_service = services.AuthService(database_service)
+
+    bot_builder.add_dependency("db", database_service)
+    bot_builder.add_dependency("auth_service", auth_service)
+    bot_builder.add_dependency("template_engine", template_service)
+    bot_builder.add_dependency("context_engine", context_service)
+
+    bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
+
+    bot_builder.add_contexts([resolvers.start_context])
+
+    command_handlers = [("start", handlers.cmd_start, "Начать взаимодействие с ботом")]
+
+    for cmd, handler, desc in command_handlers:
+        bot_builder.add_command_handler(cmd, handler, desc)
 
     bot = bot_builder.build()
 

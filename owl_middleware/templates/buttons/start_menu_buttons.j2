@@ -1,0 +1,8 @@
+[
+    {"text": "Мои задачи", "callback_data": "tasks_{{ user_id }}"},
+    {"text": "Настройки", "callback_data": "settings"}
+    {% if is_admin %},
+    {"text": "Админ панель", "callback_data": "admin"},
+    {"text": "Статистика", "callback_data": "stats"}
+    {% endif %}
+]
