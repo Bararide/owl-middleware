@@ -77,9 +77,17 @@ async def main() -> None:
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
 
-    bot_builder.add_contexts([resolvers.start_context])
+    bot_builder.add_contexts(
+        [
+            resolvers.start_context,
+            resolvers.registration_context,
+        ]
+    )
 
-    command_handlers = [("start", handlers.cmd_start, "Начать взаимодействие с ботом")]
+    command_handlers = [
+        ("start", handlers.cmd_start, "Начать взаимодействие с ботом"),
+        ("register", handlers.cmd_register, "Зарегистрироваться в системе"),
+    ]
 
     for cmd, handler, desc in command_handlers:
         bot_builder.add_command_handler(cmd, handler, desc)
