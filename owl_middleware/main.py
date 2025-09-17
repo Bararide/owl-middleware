@@ -59,6 +59,7 @@ async def main() -> None:
 
     database_service = services.DBService(getenv("MONGO_URI"), getenv("DATABASE_NAME"))
     auth_service = services.AuthService(database_service)
+    file_service = services.FileService(database_service)
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
@@ -73,6 +74,7 @@ async def main() -> None:
     bot_builder.add_dependency("db", database_service)
     bot_builder.add_dependency("auth_service", auth_service)
     bot_builder.add_dependency("auth_middleware", auth_middleware)
+    bot_builder.add_dependency("file_service", file_service)
     bot_builder.add_dependency("template_engine", template_service)
     bot_builder.add_dependency("context_engine", context_service)
 
