@@ -8,8 +8,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
-from models import User
-from services import AuthService
+from models import User, File
+from services import AuthService, FileService
 from celery.result import AsyncResult
 from fastbot.decorators import (
     with_template_engine,
@@ -25,7 +25,10 @@ async def callback_file_list(
     callback: types.CallbackQuery,
     user: User,
     ten: TemplateEngine,
+    file_service: FileService,
     auth_service: AuthService,
     cen: ContextEngine,
 ):
-    return {"context": await cen.get("file_list")}
+    user_files = await file_service.get_files_by_user(user)
+
+    return {"context": await cen.get("file_list", {"files": user_files})}

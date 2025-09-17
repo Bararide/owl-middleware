@@ -1,4 +1,4 @@
-from models import User
+from models import User, File
 from fastbot.decorators import register_context
 
 
@@ -22,5 +22,5 @@ async def registration_context(user: User, success: bool):
 
 
 @register_context("file_list")
-async def file_list_context(files: list):
+async def file_list_context(files: list[File]):
     return {"files": files}
