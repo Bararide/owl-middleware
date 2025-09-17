@@ -19,3 +19,8 @@ async def registration_context(user: User, success: bool):
         "user": user,
         "message": "Регистрация прошла успешно!" if success else "Ошибка регистрации",
     }
+
+
+@register_context("file_list")
+async def file_list_context(files: list):
+    return {"files": files}

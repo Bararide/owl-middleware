@@ -22,6 +22,7 @@ import models
 import resolvers
 import middleware
 import handlers
+import filters
 
 load_dotenv()
 
@@ -91,6 +92,10 @@ async def main() -> None:
 
     for cmd, handler, desc in command_handlers:
         bot_builder.add_command_handler(cmd, handler, desc)
+
+    bot_builder.add_callback_query_handler(
+        filters.callback_file_list, F.data.contains("file_list")
+    )
 
     bot = bot_builder.build()
 

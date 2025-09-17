@@ -1,6 +1,8 @@
 [
     {"text": "Мои задачи", "callback_data": "tasks_{{ user_id }}"},
-    {"text": "Настройки", "callback_data": "settings"}
+    {"text": "Настройки", "callback_data": "settings"},
+    {"text": "Загрузить файл", "callback_data": "file_upload"},
+    {"text": "Просмотр файлов", "callback_data": "file_list"}
     {% if is_admin %},
     {"text": "Админ панель", "callback_data": "admin"},
     {"text": "Статистика", "callback_data": "stats"}
