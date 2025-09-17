@@ -29,6 +29,8 @@ async def callback_file_list(
     auth_service: AuthService,
     cen: ContextEngine,
 ):
-    result = await file_service.get_files_by_user(user)
-
-    return {"context": await cen.get("file_list", files=result.unwrap_or([]))}
+    return {
+        "context": await cen.get(
+            "file_list", files=await file_service.get_files_by_user(user)
+        )
+    }
