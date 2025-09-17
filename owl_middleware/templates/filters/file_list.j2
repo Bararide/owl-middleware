@@ -1,8 +1,8 @@
 {% block content %}
 {{ "File list" | bold }}
 
-{% if context.files %}
-{% for file in context.files %}
+{% if files %}
+{% for file in files %}
 • {{ file.name }} (ID: {{ file.id }})
 {% endfor %}
 {% else %}

@@ -84,6 +84,7 @@ async def main() -> None:
         [
             resolvers.start_context,
             resolvers.registration_context,
+            resolvers.file_list_context,
         ]
     )
 
