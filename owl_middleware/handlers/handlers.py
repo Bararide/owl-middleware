@@ -36,6 +36,7 @@ async def handle_file_upload(
         "name": document.file_name or f"file_{document.file_id}",
         "size": document.file_size,
         "user_id": user.id,
+        "user": user,
         "created_at": datetime.now(),
         "mime_type": document.mime_type or "application/octet-stream",
     }
