@@ -79,6 +79,7 @@ async def main() -> None:
     bot_builder.add_dependency("context_engine", context_service)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
+    bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)
 
     bot_builder.add_contexts(
         [
