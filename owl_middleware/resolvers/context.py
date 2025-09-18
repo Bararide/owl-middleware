@@ -24,3 +24,10 @@ async def registration_context(user: User, success: bool):
 @register_context("file_list")
 async def file_list_context(files: list[File]):
     return {"files": files}
+
+
+@register_context("file_upload")
+async def file_upload_context(
+    success: bool = False, error: str = "", file: File = None
+):
+    return {"success": success, "error": error, "file": file}

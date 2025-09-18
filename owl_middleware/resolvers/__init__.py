@@ -4,6 +4,7 @@ from .context import (
     registration_error_context,
     registration_context,
     file_list_context,
+    file_upload_context,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "registration_error_context",
     "registration_context",
     "file_list_context",
+    "file_upload_context",
 ]

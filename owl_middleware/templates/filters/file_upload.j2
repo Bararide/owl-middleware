@@ -1,0 +1,15 @@
+{% block content %}
+{{ "File upload" | bold }}
+
+{% if success %}
+✅ File uploaded successfully!
+• Name: {{ file.name }}
+• ID: {{ file.id }}
+• Size: {{ file.size }} bytes
+{% elif error %}
+❌ Error: {{ error }}
+{% else %}
+Please send a file to upload...
+{% endif %}
+
+{% endblock %}

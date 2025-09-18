@@ -85,12 +85,14 @@ async def main() -> None:
             resolvers.start_context,
             resolvers.registration_context,
             resolvers.file_list_context,
+            resolvers.file_upload_context,
         ]
     )
 
     command_handlers = [
         ("start", handlers.cmd_start, "Начать взаимодействие с ботом"),
         ("register", handlers.cmd_register, "Зарегистрироваться в системе"),
+        ("upload", handlers.handle_file_upload, "Загрузить файл"),
     ]
 
     for cmd, handler, desc in command_handlers:
@@ -99,6 +101,12 @@ async def main() -> None:
     bot_builder.add_callback_query_handler(
         filters.callback_file_list, F.data.contains("file_list")
     )
+
+    bot_builder.add_callback_query_handler(
+        filters.callback_file_upload, F.data.contains("file_upload")
+    )
+
+    bot_builder.add_handler(handlers.handle_file_upload, F.document)
 
     bot = bot_builder.build()
 

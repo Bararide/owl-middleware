@@ -1,12 +1,11 @@
 {% block content %}
 {{ "File list" | bold }}
-
-{% if files %}
-{% for file in files %}
-• {{ file.name }} (ID: {{ file.id }})
-{% endfor %}
+{% if files.is_ok() and files.unwrap() | length > 0 %}
+    {% for file in files.unwrap() %}
+        • {{ file.name }} (ID: {{ file.id }})
+    {% endfor %}
 {% else %}
-No files found
+    No files found
 {% endif %}
 
 {% endblock %}
