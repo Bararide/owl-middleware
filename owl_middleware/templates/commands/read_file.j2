@@ -1,13 +1,23 @@
-{% if error %}
-📄 <b>Read File Error</b>
+{% block content %}
+📖 <b>Чтение файла</b>
 
-❌ {{ error }}
-{% else %}
-📄 <b>File Content</b>
-
-📁 <b>Path:</b> {{ path }}
-📏 <b>Size:</b> {{ size }} bytes
-
-📋 <b>Content:</b>
-<code>{{ content[:1000] }}{% if content|length > 1000 %}...{% endif %}</code>
+{% if path %}
+📁 <b>Путь:</b> {{ path }}
 {% endif %}
+
+{% if has_content %}
+📏 <b>Размер:</b> {{ size | format_size }}
+📋 <b>Содержимое:</b>
+
+<pre>{{ preview }}</pre>
+
+{% if size > 200 %}
+{{ "Показаны первые 200 символов. Используйте команду для полного просмотра" | italic }}
+{% endif %}
+{% elif error %}
+❌ <b>Ошибка чтения:</b>
+{{ error | italic }}
+{% else %}
+📭 <i>Файл не содержит текста или пуст</i>
+{% endif %}
+{% endblock %}

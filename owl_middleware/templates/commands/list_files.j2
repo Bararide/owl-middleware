@@ -1,0 +1,23 @@
+{% block content %}
+📂 <b>Ваши файлы</b>
+
+{% if has_files %}
+📊 <b>Всего файлов:</b> {{ count }}
+📏 <b>Общий размер:</b> {{ total_size }}
+
+{% for file in files %}
+▫️ <b>{{ file.name }}</b>
+   📁 <b>Путь:</b> {{ file.path }}
+   📏 <b>Размер в БД:</b> {{ file.db_size }}
+   📏 <b>Размер в хранилище:</b> {{ file.size if file.size != "N/A" else "N/A" }}
+   📅 <b>Дата загрузки:</b> {{ file.created_at | format_date }}
+   {% if file.error %}❌ <b>Ошибка:</b> {{ file.error }}{% endif %}
+{% endfor %}
+{% else %}
+📭 <i>У вас пока нет загруженных файлов</i>
+{% endif %}
+
+{% if error %}
+❌ <b>Ошибка:</b> {{ error }}
+{% endif %}
+{% endblock %}

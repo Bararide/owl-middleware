@@ -1,0 +1,21 @@
+{% block content %}
+🔍 <b>Результаты поиска</b>
+
+{% if has_result %}
+📋 <b>Запрос:</b> "{{ query }}"
+📊 <b>Найдено результатов:</b> {{ count }}
+
+{% for item in results %}
+📄 <b>Результат {{ loop.index }}:</b>
+   {% if item.text %}📝 {{ item.text | truncate(80) }}{% endif %}
+   {% if item.score %}📊 <b>Сходство:</b> {{ (item.score * 100) | round(2) }}%{% endif %}
+   {% if item.path %}📁 <b>Файл:</b> {{ item.path }}{% endif %}
+{% endfor %}
+{% else %}
+📭 <i>По вашему запросу ничего не найдено</i>
+{% endif %}
+
+{% if error %}
+❌ <b>Ошибка:</b> {{ error }}
+{% endif %}
+{% endblock %}

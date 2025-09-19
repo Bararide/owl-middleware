@@ -18,7 +18,7 @@ class ApiService:
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self):
         await self.close()
 
     async def connect(self) -> Result[bool, Exception]:

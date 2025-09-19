@@ -1,0 +1,17 @@
+{% block content %}
+💾 <b>Статистика хранилища</b>
+
+{% if has_data %}
+📊 <b>Всего файлов:</b> {{ total_files }}
+📏 <b>Общий размер:</b> {{ total_size_mb | round(2) }} MB
+📐 <b>Средний размер файла:</b> {{ avg_file_size | format_size }}
+
+{{ "Статистика обновлена в реальном времени" | italic }}
+{% else %}
+📭 <i>В хранилище пока нет файлов</i>
+{% endif %}
+
+{% if error %}
+❌ <b>Ошибка:</b> {{ error }}
+{% endif %}
+{% endblock %}

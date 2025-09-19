@@ -100,6 +100,7 @@ async def main() -> None:
             resolvers.read_file_context,
             resolvers.rebuild_index_context,
             resolvers.health_check_context,
+            resolvers.list_files_context,
         ]
     )
 

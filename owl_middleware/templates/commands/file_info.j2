@@ -1,0 +1,26 @@
+{% block content %}
+📄 <b>Информация о файле</b>
+
+{% if file %}
+📋 <b>Название:</b> {{ file.name }}
+📏 <b>Размер в БД:</b> {{ file.size | format_size }}
+📏 <b>Размер в API:</b> {{ api_size | format_size }}
+🆔 <b>ID:</b> <code>{{ file.id }}</code>
+📅 <b>Дата загрузки:</b> {{ file.created_at | format_date }}
+
+{% if size_match %}
+✅ <b>Соответствие размеров:</b> OK
+{% else %}
+⚠️ <b>Соответствие размеров:</b> Различаются
+{% endif %}
+
+{% if has_content %}
+📋 <b>Превью содержимого:</b>
+<pre>{{ content | truncate(150) }}</pre>
+{% endif %}
+{% endif %}
+
+{% if error %}
+❌ <b>Ошибка:</b> {{ error }}
+{% endif %}
+{% endblock %}
