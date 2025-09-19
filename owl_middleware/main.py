@@ -97,6 +97,12 @@ async def main() -> None:
         ("register", handlers.cmd_register, "Зарегистрироваться в системе"),
         ("upload", handlers.handle_file_upload, "Загрузить файл"),
         ("search", handlers.handle_search, "Семантический поиск"),
+        ("read", handlers.handle_read_file, "Прочитать файл"),
+        ("rebuild_index", handlers.handle_rebuild_index, "Перестроить индекс"),
+        ("health", handlers.handle_health_check, "Проверить состояние сервиса"),
+        ("list", handlers.handle_list_files, "Список загруженных файлов"),
+        ("delete", handlers.handle_delete_file, "Удалить файл"),
+        ("status", handlers.handle_service_status, "Статус сервиса"),
     ]
 
     for cmd, handler, desc in command_handlers:

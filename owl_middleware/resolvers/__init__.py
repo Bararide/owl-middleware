@@ -6,6 +6,17 @@ from .context import (
     registration_context,
     file_list_context,
     file_upload_context,
+    semantic_search_context,
+    read_file_context,
+    rebuild_index_context,
+    health_check_context,
+    list_files_context,
+    delete_file_context,
+    service_status_context,
+    file_info_context,
+    search_result_context,
+    api_error_context,
+    storage_stats_context,
 )
 
 __all__ = [
@@ -16,4 +27,15 @@ __all__ = [
     "registration_context",
     "file_list_context",
     "file_upload_context",
+    "semantic_search_context",
+    "read_file_context",
+    "rebuild_index_context",
+    "health_check_context",
+    "list_files_context",
+    "delete_file_context",
+    "service_status_context",
+    "file_info_context",
+    "search_result_context",
+    "api_error_context",
+    "storage_stats_context",
 ]
