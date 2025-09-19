@@ -1,0 +1,16 @@
+{% if error %}
+🔍 <b>Semantic Search Error</b>
+
+❌ {{ error }}
+{% else %}
+🔍 <b>Semantic Search Results</b>
+
+📝 <b>Query:</b> {{ query }}
+📊 <b>Found:</b> {{ count }} results
+
+{% for result in results %}
+📁 <b>File:</b> {{ result.path }}
+⭐ <b>Score:</b> {{ "%.3f"|format(result.score) }}
+
+{% endfor %}
+{% endif %}

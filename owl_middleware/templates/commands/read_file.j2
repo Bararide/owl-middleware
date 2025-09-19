@@ -1,0 +1,13 @@
+{% if error %}
+📄 <b>Read File Error</b>
+
+❌ {{ error }}
+{% else %}
+📄 <b>File Content</b>
+
+📁 <b>Path:</b> {{ path }}
+📏 <b>Size:</b> {{ size }} bytes
+
+📋 <b>Content:</b>
+<code>{{ content[:1000] }}{% if content|length > 1000 %}...{% endif %}</code>
+{% endif %}
