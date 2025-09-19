@@ -1,11 +1,14 @@
+from typing import Any, Dict
 from models import File, User
 from fastbot.core import Result, result_try, Err, Ok
 from .db import DBService
+from services import ApiService
 
 
 class FileService:
-    def __init__(self, db_service: DBService):
+    def __init__(self, db_service: DBService, api_service: ApiService):
         self.db_service = db_service
+        self.api_service = api_service
         self.files = self.db_service.db["files"]
 
     @result_try
@@ -22,6 +25,49 @@ class FileService:
         file = File(**file_data)
         await self.files.insert_one(file.model_dump())
         return Ok(file)
+
+    @result_try
+    async def create_file_with_sync(
+        self, file_data: dict, content: str
+    ) -> Result[File, Exception]:
+        create_db_result = await self.create_file(file_data)
+        if create_db_result.is_err():
+            return create_db_result
+
+        file = create_db_result.unwrap()
+
+        create_api_result = await self.api_service.create_file_from_model(file, content)
+        if create_api_result.is_err():
+            await self.delete_file(file.id)
+            return create_api_result
+
+        return Ok(file)
+
+    @result_try
+    async def get_file_with_content(
+        self, file_id: str
+    ) -> Result[Dict[str, Any], Exception]:
+        file_result = await self.get_file(file_id)
+        if file_result.is_err() or file_result.unwrap() is None:
+            return file_result
+
+        file = file_result.unwrap()
+
+        path = f"/{file.id}_{file.name}" if file.name else f"/{file.id}"
+        content_result = await self.api_service.read_file(path)
+
+        if content_result.is_err():
+            return content_result
+
+        content_data = content_result.unwrap()
+
+        combined_data = {
+            **file.model_dump(),
+            "content": content_data.get("content", ""),
+            "api_size": content_data.get("size", 0),
+        }
+
+        return Ok(combined_data)
 
     @result_try
     async def update_file(

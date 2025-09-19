@@ -60,6 +60,7 @@ async def main() -> None:
     database_service = services.DBService(getenv("MONGO_URI"), getenv("DATABASE_NAME"))
     auth_service = services.AuthService(database_service)
     file_service = services.FileService(database_service)
+    api_service = services.APIservice(getenv("VFS_HTTP_PATH"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
@@ -74,6 +75,7 @@ async def main() -> None:
     bot_builder.add_dependency("db", database_service)
     bot_builder.add_dependency("auth_service", auth_service)
     bot_builder.add_dependency("auth_middleware", auth_middleware)
+    bot_builder.add_dependency("api_service", api_service)
     bot_builder.add_dependency("file_service", file_service)
     bot_builder.add_dependency("template_engine", template_service)
     bot_builder.add_dependency("context_engine", context_service)
@@ -94,6 +96,7 @@ async def main() -> None:
         ("start", handlers.cmd_start, "Начать взаимодействие с ботом"),
         ("register", handlers.cmd_register, "Зарегистрироваться в системе"),
         ("upload", handlers.handle_file_upload, "Загрузить файл"),
+        ("search", handlers.handle_search, "Семантический поиск"),
     ]
 
     for cmd, handler, desc in command_handlers:
