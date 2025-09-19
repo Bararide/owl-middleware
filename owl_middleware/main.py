@@ -58,9 +58,9 @@ async def main() -> None:
     )
 
     database_service = services.DBService(getenv("MONGO_URI"), getenv("DATABASE_NAME"))
+    api_service = services.ApiService(getenv("VFS_HTTP_PATH"))
     auth_service = services.AuthService(database_service)
-    file_service = services.FileService(database_service)
-    api_service = services.APIservice(getenv("VFS_HTTP_PATH"))
+    file_service = services.FileService(database_service, api_service)
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
@@ -89,6 +89,17 @@ async def main() -> None:
             resolvers.registration_context,
             resolvers.file_list_context,
             resolvers.file_upload_context,
+            resolvers.semantic_search_context,
+            resolvers.service_status_context,
+            resolvers.file_info_context,
+            resolvers.search_result_context,
+            resolvers.api_error_context,
+            resolvers.storage_stats_context,
+            resolvers.registration_error_context,
+            resolvers.delete_file_context,
+            resolvers.read_file_context,
+            resolvers.rebuild_index_context,
+            resolvers.health_check_context,
         ]
     )
 

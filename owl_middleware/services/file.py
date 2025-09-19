@@ -2,7 +2,7 @@ from typing import Any, Dict
 from models import File, User
 from fastbot.core import Result, result_try, Err, Ok
 from .db import DBService
-from services import ApiService
+from .api import ApiService
 
 
 class FileService:
