@@ -93,6 +93,7 @@ async def handle_search(
     cen: ContextEngine,
 ):
     query = message.text.strip()
+    query = query.replace("/search", "").strip()
 
     if not query:
         return {

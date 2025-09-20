@@ -99,7 +99,10 @@ class ApiService:
             async with self.session.post("/semantic", json=payload) as response:
                 if response.status == 200:
                     data = await response.json()
-                    return Ok(data)
+                    if "data" in data:
+                        return Ok(data["data"])
+                    else:
+                        return Ok(data)
                 else:
                     error_data = await response.json()
                     error_msg = error_data.get("error", f"HTTP error {response.status}")
