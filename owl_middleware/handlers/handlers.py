@@ -54,7 +54,9 @@ async def handle_file_upload(
     file = db_result.unwrap()
 
     try:
-        file_content = await message.bot.download_file(document.file_id)
+        file_info = await message.bot.get_file(document.file_id)
+
+        file_content = await message.bot.download_file(file_info.file_path)
         content_text = file_content.read().decode("utf-8", errors="ignore")
 
         api_result = await api_service.create_file(
@@ -62,6 +64,7 @@ async def handle_file_upload(
         )
 
         if api_result.is_err():
+            Logger.info(f"File content: {content_text}")
             await file_service.delete_file(file.id)
             error = api_result.unwrap_err()
             Logger.error(f"Error uploading to C++ service: {error}")

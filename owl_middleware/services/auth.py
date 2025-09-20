@@ -1,6 +1,5 @@
 from models import User
 from fastbot.core import Result, result_try
-from fastbot.logger import Logger
 from .db import DBService
 
 
