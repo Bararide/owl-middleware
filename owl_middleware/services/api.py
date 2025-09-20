@@ -2,8 +2,10 @@ import aiofiles
 import asyncio
 import os
 import aiohttp
-from typing import Dict, List, Any, Optional
 import json
+
+from typing import Dict, List, Any, Optional
+from pampy import _, match
 
 from models import File, User
 from fastbot.core import Result, result_try, Err, Ok
@@ -18,8 +20,39 @@ class ApiService:
         await self.connect()
         return self
 
-    async def __aexit__(self):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
+
+    def _handle_response(self, response: aiohttp.ClientResponse, result: Any) -> Result:
+        return match(
+            response.status,
+            200,
+            Ok(result),
+            201,
+            Ok(result),
+            204,
+            Ok({}),
+            400,
+            Err(ValueError(result.get("error", "Bad Request"))),
+            401,
+            Err(PermissionError("Unauthorized")),
+            403,
+            Err(PermissionError("Forbidden")),
+            404,
+            Err(FileNotFoundError(result.get("error", "Not Found"))),
+            500,
+            Err(
+                Exception(
+                    f"Server Error: {result.get('error', 'Internal Server Error')}"
+                )
+            ),
+            _,
+            Err(
+                Exception(
+                    f"HTTP error {response.status}: {result.get('error', 'Unknown error')}"
+                )
+            ),
+        )
 
     async def connect(self) -> Result[bool, Exception]:
         try:
@@ -53,37 +86,12 @@ class ApiService:
 
         try:
             async with self.session.post("/files/create", json=payload) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return Ok(data)
-                else:
-                    error_data = await response.json()
-                    error_msg = error_data.get("error", f"HTTP error {response.status}")
-                    return Err(Exception(error_msg))
+                data = await response.json()
+                return self._handle_response(response, data)
         except aiohttp.ClientError as e:
             return Err(e)
-
-    @result_try
-    async def read_file(self, path: str) -> Result[Dict[str, Any], Exception]:
-        connect_result = await self.connect()
-        if connect_result.is_err():
-            return connect_result
-
-        params = {"path": path}
-
-        try:
-            async with self.session.get("/files/read", params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return Ok(data)
-                elif response.status == 404:
-                    return Err(FileNotFoundError(f"File not found: {path}"))
-                else:
-                    error_data = await response.json()
-                    error_msg = error_data.get("error", f"HTTP error {response.status}")
-                    return Err(Exception(error_msg))
-        except aiohttp.ClientError as e:
-            return Err(e)
+        except json.JSONDecodeError as e:
+            return Err(Exception(f"Invalid JSON response: {e}"))
 
     @result_try
     async def semantic_search(
@@ -111,6 +119,23 @@ class ApiService:
             return Err(e)
 
     @result_try
+    async def read_file(self, path: str) -> Result[Dict[str, Any], Exception]:
+        connect_result = await self.connect()
+        if connect_result.is_err():
+            return connect_result
+
+        params = {"path": path}
+
+        try:
+            async with self.session.get("/files/read", params=params) as response:
+                data = await response.json()
+                return self._handle_response(response, data)
+        except aiohttp.ClientError as e:
+            return Err(e)
+        except json.JSONDecodeError as e:
+            return Err(Exception(f"Invalid JSON response: {e}"))
+
+    @result_try
     async def rebuild_index(self) -> Result[Dict[str, Any], Exception]:
         connect_result = await self.connect()
         if connect_result.is_err():
@@ -118,15 +143,12 @@ class ApiService:
 
         try:
             async with self.session.post("/rebuild") as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return Ok(data)
-                else:
-                    error_data = await response.json()
-                    error_msg = error_data.get("error", f"HTTP error {response.status}")
-                    return Err(Exception(error_msg))
+                data = await response.json()
+                return self._handle_response(response, data)
         except aiohttp.ClientError as e:
             return Err(e)
+        except json.JSONDecodeError as e:
+            return Err(Exception(f"Invalid JSON response: {e}"))
 
     @result_try
     async def get_root(self) -> Result[Dict[str, Any], Exception]:
@@ -136,15 +158,12 @@ class ApiService:
 
         try:
             async with self.session.get("/") as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return Ok(data)
-                else:
-                    error_data = await response.json()
-                    error_msg = error_data.get("error", f"HTTP error {response.status}")
-                    return Err(Exception(error_msg))
+                data = await response.json()
+                return self._handle_response(response, data)
         except aiohttp.ClientError as e:
             return Err(e)
+        except json.JSONDecodeError as e:
+            return Err(Exception(f"Invalid JSON response: {e}"))
 
     @result_try
     async def upload_file(
@@ -157,7 +176,7 @@ class ApiService:
             return await self.create_file(remote_path, content)
 
         except FileNotFoundError as e:
-            return Err(e)
+            return Err(FileNotFoundError(f"Local file not found: {local_path}"))
         except Exception as e:
             return Err(e)
 
@@ -170,7 +189,11 @@ class ApiService:
         if read_result.is_err():
             return read_result
 
-        content = read_result.unwrap().get("content", "")
+        content_data = read_result.unwrap()
+        content = content_data.get("content", "")
+
+        if not content:
+            return Err(ValueError("File content is empty"))
 
         try:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
@@ -182,6 +205,7 @@ class ApiService:
                 {
                     "message": f"File downloaded successfully to {local_path}",
                     "size": len(content),
+                    "path": local_path,
                 }
             )
 
@@ -195,7 +219,7 @@ class ApiService:
             return connect_result
 
         try:
-            async with self.session.get("/", timeout=5) as response:
+            async with self.session.get("/health", timeout=5) as response:
                 return Ok(response.status == 200)
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             return Err(e)
@@ -205,7 +229,6 @@ class ApiService:
         self, file: File, content: str
     ) -> Result[Dict[str, Any], Exception]:
         path = f"/{file.id}_{file.name}" if file.name else f"/{file.id}"
-
         return await self.create_file(path, content)
 
     @result_try
@@ -219,5 +242,11 @@ class ApiService:
         if search_result.is_err():
             return search_result
 
-        files_data = search_result.unwrap().get("results", [])
-        return Ok(files_data)
+        search_data = search_result.unwrap()
+
+        if isinstance(search_data, dict) and "results" in search_data:
+            return Ok(search_data["results"])
+        elif isinstance(search_data, list):
+            return Ok(search_data)
+        else:
+            return Ok([])
