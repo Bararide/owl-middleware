@@ -83,7 +83,7 @@ async def main() -> None:
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)
 
-    bot_builder.add_contexts(
+    await bot_builder.add_contexts(
         [
             resolvers.start_context,
             resolvers.registration_context,
@@ -118,17 +118,17 @@ async def main() -> None:
     ]
 
     for cmd, handler, desc in command_handlers:
-        bot_builder.add_command_handler(cmd, handler, desc)
+        await bot_builder.add_command_handler(cmd, handler, desc)
 
-    bot_builder.add_callback_query_handler(
+    await bot_builder.add_callback_query_handler(
         filters.callback_file_list, F.data.contains("file_list")
     )
 
-    bot_builder.add_callback_query_handler(
+    await bot_builder.add_callback_query_handler(
         filters.callback_file_upload, F.data.contains("file_upload")
     )
 
-    bot_builder.add_handler(handlers.handle_file_upload, F.document)
+    await bot_builder.add_handler(handlers.handle_file_upload, F.document)
 
     bot = bot_builder.build()
 
