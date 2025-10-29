@@ -7,7 +7,7 @@ import json
 from typing import Dict, List, Any, Optional
 from pampy import _, match
 
-from models import File, User
+from models import File, User, Tariff, Label
 from fastbot.core import Result, result_try, Err, Ok
 
 
@@ -75,14 +75,57 @@ class ApiService:
             return Err(e)
 
     @result_try
-    async def create_file(
-        self, path: str, content: str
+    async def create_container(
+        self,
+        user_id: str,
+        container_id: str,
+        tariff: Tariff,
+        env_label: Label,
+        type_label: Label,
+        commands: List[str],
+        privileged: bool,
     ) -> Result[Dict[str, Any], Exception]:
         connect_result = await self.connect()
         if connect_result.is_err():
             return connect_result
 
-        payload = {"path": path, "content": content}
+        payload = {
+            "user_id": user_id,
+            "container_id": container_id,
+            "memory_limits": tariff.memory_limit,
+            "storage_quota": tariff.storage_quota,
+            "file_limit": tariff.file_limit,
+            "env_label": {"key": env_label.key, "value": env_label.value},
+            "type_label": {"key": type_label.key, "value": type_label.value},
+            "commands": commands,
+            "privileged": privileged,
+        }
+
+        try:
+            async with self.session.post(
+                "/containers/create", json=payload
+            ) as response:
+                data = await response.json()
+                return self._handle_response(response, data)
+        except aiohttp.ClientError as e:
+            return Err(e)
+        except json.JSONDecodeError as e:
+            return Err(Exception(f"Invalid JSON response: {e}"))
+
+    @result_try
+    async def create_file(
+        self, path: str, content: str, user_id: str, container_id: str
+    ) -> Result[Dict[str, Any], Exception]:
+        connect_result = await self.connect()
+        if connect_result.is_err():
+            return connect_result
+
+        payload = {
+            "path": path,
+            "content": content,
+            "user_id": user_id,
+            "container_id": container_id,
+        }
 
         try:
             async with self.session.post("/files/create", json=payload) as response:

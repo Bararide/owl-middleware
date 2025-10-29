@@ -7,6 +7,7 @@ from models import User
 
 class File(BaseModel):
     id: str
+    container_id: str
     name: str
     size: Optional[int] = None
     user_id: int

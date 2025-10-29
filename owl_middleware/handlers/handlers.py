@@ -60,7 +60,10 @@ async def handle_file_upload(
         content_text = file_content.read().decode("utf-8", errors="ignore")
 
         api_result = await api_service.create_file(
-            path=f"/{file.id}_{file.name}", content=content_text
+            path=f"/{file.id}_{file.name}",
+            content=content_text,
+            user_id=user.id,
+            container_id="container_" + user.id,
         )
 
         if api_result.is_err():
