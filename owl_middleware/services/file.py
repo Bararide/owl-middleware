@@ -1,5 +1,5 @@
 from typing import Any, Dict
-from models import File, User
+from models import File, User, Container
 from fastbot.core import Result, result_try, Err, Ok
 from .db import DBService
 from .api import ApiService
@@ -82,6 +82,6 @@ class FileService:
         return result.deleted_count > 0
 
     @result_try
-    async def get_files_by_user(self, user: User) -> list[File]:
-        files = await self.files.find({"user_id": user.id}).to_list(None)
+    async def get_files_by_container(self, container: Container) -> list[File]:
+        files = await self.files.find({"container_id": container.id}).to_list(None)
         return [File(**file) for file in files]

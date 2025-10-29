@@ -61,6 +61,7 @@ async def main() -> None:
     api_service = services.ApiService(getenv("VFS_HTTP_PATH"))
     auth_service = services.AuthService(database_service)
     file_service = services.FileService(database_service, api_service)
+    container_service = services.ContainerService(database_service, api_service)
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
@@ -79,6 +80,7 @@ async def main() -> None:
     bot_builder.add_dependency("file_service", file_service)
     bot_builder.add_dependency("template_engine", template_service)
     bot_builder.add_dependency("context_engine", context_service)
+    bot_builder.add_dependency("container_service", container_service)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)

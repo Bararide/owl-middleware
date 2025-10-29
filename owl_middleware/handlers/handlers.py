@@ -6,7 +6,7 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
-from services import AuthService, FileService, ApiService
+from services import AuthService, FileService, ApiService, ContainerService
 from fastbot.decorators import (
     with_template_engine,
     with_parse_mode,
@@ -246,9 +246,13 @@ async def handle_list_files(
     ten: TemplateEngine,
     file_service: FileService,
     api_service: ApiService,
+    container_service: ContainerService,
     cen: ContextEngine,
 ):
-    files_result = await file_service.get_files_by_user(user)
+    containers = await container_service.get_containers_by_user_id(user.id)
+    files_result = [
+        await file_service.get_files_by_container(container) for container in containers
+    ]
 
     if files_result.is_err():
         error = files_result.unwrap_err()
