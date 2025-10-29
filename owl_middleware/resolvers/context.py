@@ -27,6 +27,31 @@ async def file_list_context(files: list[File]):
     return {"files": files}
 
 
+@register_context("create_container_help")
+async def create_container_help_context(user_id: str = ""):
+    return {"user_id": user_id}
+
+
+@register_context("create_container")
+async def create_container_context(
+    success: bool = False,
+    container_id: str = "",
+    user_id: str = "",
+    error: str = "",
+    container: Dict[str, Any] = None,
+    limits: Dict[str, Any] = None,
+):
+    return {
+        "success": success,
+        "container_id": container_id,
+        "user_id": user_id,
+        "error": error,
+        "container": container or {},
+        "limits": limits or {},
+        "has_limits": bool(limits),
+    }
+
+
 @register_context("file_upload")
 async def file_upload_context(
     success: bool = False, error: str = "", file: File = None

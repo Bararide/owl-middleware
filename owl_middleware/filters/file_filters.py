@@ -14,6 +14,20 @@ from fastbot.decorators import (
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
+@with_auto_reply("filters/create_container_help.j2")
+async def handle_create_container_callback(
+    callback_query: types.CallbackQuery,
+    user: User,
+    ten: TemplateEngine,
+    cen: ContextEngine,
+):
+    await callback_query.answer()
+
+    return {"context": await cen.get("create_container_help", user_id=user.id)}
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
 @with_auto_reply("filters/file_list.j2")
 async def callback_file_list(
     callback: types.CallbackQuery,

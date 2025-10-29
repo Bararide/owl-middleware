@@ -16,6 +16,129 @@ from fastbot.decorators import (
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
+@with_auto_reply("commands/create_container.j2")
+async def handle_create_container(
+    message: Message,
+    user: User,
+    ten: TemplateEngine,
+    container_service: ContainerService,
+    auth_service: AuthService,
+    api_service: ApiService,
+    cen: ContextEngine,
+):
+    args = message.text.split()[1:]
+
+    if not args:
+        return {
+            "context": await cen.get(
+                "create_container",
+                error="Использование: /create_container <container_id> [memory_limit] [storage_quota] [file_limit]",
+            )
+        }
+
+    container_id = args[0]
+
+    memory_limit = int(args[1]) if len(args) > 1 else 512
+    storage_quota = int(args[2]) if len(args) > 2 else 1024
+    file_limit = int(args[3]) if len(args) > 3 else 10
+
+    if memory_limit <= 0 or storage_quota <= 0 or file_limit <= 0:
+        return {
+            "context": await cen.get(
+                "create_container",
+                error="Все лимиты должны быть положительными числами",
+            )
+        }
+
+    if memory_limit > 4096:
+        return {
+            "context": await cen.get(
+                "create_container", error="Лимит памяти не может превышать 4096 MB"
+            )
+        }
+
+    if storage_quota > 10240:
+        return {
+            "context": await cen.get(
+                "create_container", error="Лимит хранилища не может превышать 10240 MB"
+            )
+        }
+
+    container_data = {
+        "user_id": str(user.id),
+        "container_id": container_id,
+        "memory_limit": memory_limit,
+        "storage_quota": storage_quota,
+        "file_limit": file_limit,
+        "env_label": {"key": "environment", "value": "development"},
+        "type_label": {"key": "type", "value": "workspace"},
+        "commands": ["search", "debug", "all", "create"],
+        "privileged": False,
+    }
+
+    try:
+        db_result = await container_service.create_container(container_data)
+
+        if db_result.is_err():
+            error = db_result.unwrap_err()
+            Logger.error(f"Error creating container in DB: {error}")
+            return {
+                "context": await cen.get(
+                    "create_container", error=f"Ошибка базы данных: {error}"
+                )
+            }
+
+        container = db_result.unwrap()
+
+        api_result = await api_service.create_container(
+            user_id=str(user.id),
+            container_id=container_id,
+            tariff=container.tariff,
+            env_label=container.env_label,
+            type_label=container.type_label,
+            commands=container.commands,
+            privileged=container.privileged,
+        )
+
+        if api_result.is_err():
+            await container_service.delete_container(container_id)
+            error = api_result.unwrap_err()
+            Logger.error(f"Error creating container in C++ service: {error}")
+            return {
+                "context": await cen.get(
+                    "create_container", error=f"Ошибка сервиса контейнеров: {error}"
+                )
+            }
+
+        limits_result = await container_service.check_container_limits(container_id)
+        limits = limits_result.unwrap() if limits_result.is_ok() else {}
+
+        Logger.info(
+            f"Container created successfully: {container_id} for user {user.id}"
+        )
+
+        return {
+            "context": await cen.get(
+                "create_container",
+                success=True,
+                container_id=container_id,
+                user_id=str(user.id),
+                container=container,
+                limits=limits,
+            )
+        }
+
+    except Exception as e:
+        Logger.error(f"Unexpected error in create_container: {e}")
+        return {
+            "context": await cen.get(
+                "create_container", error=f"Неожиданная ошибка: {str(e)}"
+            )
+        }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
 @with_auto_reply("filters/file_upload.j2")
 async def handle_file_upload(
     message: Message,

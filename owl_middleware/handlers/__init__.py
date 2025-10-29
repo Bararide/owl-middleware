@@ -8,6 +8,7 @@ from .handlers import (
     handle_list_files,
     handle_delete_file,
     handle_service_status,
+    handle_create_container,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "handle_list_files",
     "handle_delete_file",
     "handle_service_status",
+    "handle_create_container",
 ]

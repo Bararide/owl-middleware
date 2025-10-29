@@ -33,7 +33,7 @@ class ContainerService:
         self, container_data: dict
     ) -> Result[Container, Exception]:
         existing_container = await self.containers.find_one(
-            {"id": container_data["id"]}
+            {"id": container_data["container_id"]}
         )
         if existing_container:
             return Err(ValueError("Container with this ID already exists"))
@@ -66,6 +66,51 @@ class ContainerService:
 
         await self.containers.insert_one(container.model_dump())
         return Ok(container)
+
+    @result_try
+    async def delete_container(self, container_id: str) -> Result[bool, Exception]:
+        result = await self.containers.delete_one({"id": container_id})
+        return Ok(result.deleted_count > 0)
+
+    @result_try
+    async def check_container_limits(
+        self, container_id: str
+    ) -> Result[Dict[str, Any], Exception]:
+        """Проверка лимитов контейнера"""
+        container_result = await self.get_container(container_id)
+        if container_result.is_err():
+            return container_result
+
+        file_service = FileService(self.db_service, self.api_service)
+        container = container_result.unwrap()
+        files = await file_service.get_files_by_container(container)
+
+        total_size = sum(file.size or 0 for file in files)
+
+        limits_status = {
+            "storage": {
+                "used": total_size,
+                "limit": container.tariff.storage_qouta,
+                "exceeded": total_size > container.tariff.storage_qouta,
+                "usage_percent": (
+                    (total_size / container.tariff.storage_qouta * 100)
+                    if container.tariff.storage_qouta > 0
+                    else 0
+                ),
+            },
+            "files": {
+                "used": len(files),
+                "limit": container.tariff.file_limit,
+                "exceeded": len(files) > container.tariff.file_limit,
+                "usage_percent": (
+                    (len(files) / container.tariff.file_limit * 100)
+                    if container.tariff.file_limit > 0
+                    else 0
+                ),
+            },
+        }
+
+        return Ok(limits_status)
 
     @result_try
     async def update_container(
