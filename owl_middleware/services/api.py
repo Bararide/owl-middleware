@@ -5,6 +5,7 @@ import aiohttp
 import json
 
 from typing import Dict, List, Any, Optional
+from fastbot.logger.logger import Logger
 from pampy import _, match
 
 from models import File, User, Tariff, Label
@@ -92,7 +93,7 @@ class ApiService:
         payload = {
             "user_id": user_id,
             "container_id": container_id,
-            "memory_limits": tariff.memory_limit,
+            "memory_limit": tariff.memory_limit,
             "storage_quota": tariff.storage_quota,
             "file_limit": tariff.file_limit,
             "env_label": {"key": env_label.key, "value": env_label.value},
@@ -103,14 +104,38 @@ class ApiService:
 
         try:
             async with self.session.post(
-                "/containers/create", json=payload
+                "/containers/create",
+                json=payload,
+                headers={"Content-Type": "application/json"},
             ) as response:
-                data = await response.json()
-                return self._handle_response(response, data)
+
+                response_text = await response.text()
+                Logger.info(f"Raw response text: {response_text}")
+
+                try:
+                    data = json.loads(response_text)
+                    Logger.info(f"Parsed JSON data: {data}")
+
+                    if response.status == 200:
+                        if "data" in data:
+                            return Ok(data["data"])
+                        else:
+                            return Ok(data)
+                    else:
+                        error_msg = data.get("error", f"HTTP error {response.status}")
+                        return Err(Exception(error_msg))
+
+                except json.JSONDecodeError as e:
+                    Logger.error(f"JSON decode error: {e}")
+                    Logger.error(f"Response text that failed to parse: {response_text}")
+                    return Err(Exception(f"Invalid JSON response: {response_text}"))
+
         except aiohttp.ClientError as e:
+            Logger.error(f"HTTP client error: {e}")
             return Err(e)
-        except json.JSONDecodeError as e:
-            return Err(Exception(f"Invalid JSON response: {e}"))
+        except Exception as e:
+            Logger.error(f"Unexpected error in create_container: {e}")
+            return Err(e)
 
     @result_try
     async def create_file(

@@ -40,7 +40,7 @@ class ContainerService:
 
         tariff = Tariff(
             memory_limit=container_data["memory_limit"],
-            storage_qouta=container_data["storage_quota"],
+            storage_quota=container_data["storage_quota"],
             file_limit=container_data["file_limit"],
         )
 
@@ -76,7 +76,6 @@ class ContainerService:
     async def check_container_limits(
         self, container_id: str
     ) -> Result[Dict[str, Any], Exception]:
-        """Проверка лимитов контейнера"""
         container_result = await self.get_container(container_id)
         if container_result.is_err():
             return container_result
@@ -90,11 +89,11 @@ class ContainerService:
         limits_status = {
             "storage": {
                 "used": total_size,
-                "limit": container.tariff.storage_qouta,
-                "exceeded": total_size > container.tariff.storage_qouta,
+                "limit": container.tariff.storage_quota,
+                "exceeded": total_size > container.tariff.storage_quota,
                 "usage_percent": (
-                    (total_size / container.tariff.storage_qouta * 100)
-                    if container.tariff.storage_qouta > 0
+                    (total_size / container.tariff.storage_quota * 100)
+                    if container.tariff.storage_quota > 0
                     else 0
                 ),
             },
@@ -130,8 +129,8 @@ class ContainerService:
                 "memory_limit": update_data.pop(
                     "memory_limit", current.tariff.memory_limit
                 ),
-                "storage_qouta": update_data.pop(
-                    "storage_quota", current.tariff.storage_qouta
+                "storage_quota": update_data.pop(
+                    "storage_quota", current.tariff.storage_quota
                 ),
                 "file_limit": update_data.pop("file_limit", current.tariff.file_limit),
             }
@@ -170,8 +169,8 @@ class ContainerService:
 
         total_size = sum(file.size or 0 for file in files)
         storage_usage_percent = (
-            (total_size / container.tariff.storage_qouta * 100)
-            if container.tariff.storage_qouta > 0
+            (total_size / container.tariff.storage_quota * 100)
+            if container.tariff.storage_quota > 0
             else 0
         )
 
@@ -180,7 +179,7 @@ class ContainerService:
             "user_id": container.user_id,
             "total_files": len(files),
             "total_size": total_size,
-            "storage_quota": container.tariff.storage_qouta,
+            "storage_quota": container.tariff.storage_quota,
             "storage_usage_percent": round(storage_usage_percent, 2),
             "memory_limit": container.tariff.memory_limit,
             "file_limit": container.tariff.file_limit,
@@ -215,8 +214,8 @@ class ContainerService:
         limits_status = {
             "storage": {
                 "used": total_size,
-                "limit": container.tariff.storage_qouta,
-                "exceeded": total_size > container.tariff.storage_qouta,
+                "limit": container.tariff.storage_quota,
+                "exceeded": total_size > container.tariff.storage_quota,
             },
             "files": {
                 "used": len(files),

@@ -103,6 +103,8 @@ async def main() -> None:
             resolvers.rebuild_index_context,
             resolvers.health_check_context,
             resolvers.list_files_context,
+            resolvers.create_container_context,
+            resolvers.create_container_help_context,
         ]
     )
 
@@ -117,6 +119,7 @@ async def main() -> None:
         ("list", handlers.handle_list_files, "Список загруженных файлов"),
         ("delete", handlers.handle_delete_file, "Удалить файл"),
         ("status", handlers.handle_service_status, "Статус сервиса"),
+        ("container", handlers.handle_create_container, "Создание контейнера"),
     ]
 
     for cmd, handler, desc in command_handlers:
@@ -128,6 +131,10 @@ async def main() -> None:
 
     await bot_builder.add_callback_query_handler(
         filters.callback_file_upload, F.data.contains("file_upload")
+    )
+
+    await bot_builder.add_callback_query_handler(
+        filters.handle_create_container_callback, F.data.contains("create_container")
     )
 
     await bot_builder.add_handler(handlers.handle_file_upload, F.document)

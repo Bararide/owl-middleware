@@ -5,7 +5,11 @@ from typing import List, Dict, Any
 
 @register_context("start")
 async def start_context(user: User):
-    return {"user": user, "welcome_message": f"Добро пожаловать, {user.first_name}!"}
+    return {
+        "user": user,
+        "welcome_message": f"Добро пожаловать, {user.first_name}!",
+        "is_admin": user.is_admin,
+    }
 
 
 @register_context("registration_error")
