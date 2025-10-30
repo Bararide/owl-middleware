@@ -38,16 +38,24 @@ async def callback_file_list(
     container_service: ContainerService,
     cen: ContextEngine,
 ):
-    containers = container_service.get_containers_by_user_id(user.id)
-    return {
-        "context": await cen.get(
-            "file_list",
-            files=[
-                await file_service.get_files_by_container(container)
-                for container in containers
-            ],
-        )
-    }
+    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+
+    if containers_result.is_err():
+        return {
+            "context": await cen.get(
+                "file_list", error="Ошибка при получении контейнеров"
+            )
+        }
+
+    containers = containers_result.unwrap()
+
+    all_files = []
+    for container in containers:
+        files_result = await file_service.get_files_by_container(container)
+        if files_result.is_ok():
+            all_files.extend(files_result.unwrap())
+
+    return {"context": await cen.get("file_list", files=all_files)}
 
 
 @with_template_engine
