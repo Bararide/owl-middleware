@@ -139,6 +139,35 @@ async def handle_create_container(
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
+@with_auto_reply("filters/select_container.j2")
+async def handle_select_container(
+    message: Message,
+    user: User,
+    ten: TemplateEngine,
+    container_service: ContainerService,
+    cen: ContextEngine,
+):
+    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+
+    if containers_result.is_err() or not containers_result.unwrap():
+        return {
+            "context": await cen.get(
+                "select_container",
+                error="У вас нет контейнеров. Сначала создайте контейнер командой /container",
+            )
+        }
+
+    containers = containers_result.unwrap()
+
+    return {
+        "context": await cen.get(
+            "select_container", containers=containers, containers_count=len(containers)
+        )
+    }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
 @with_auto_reply("filters/file_upload.j2")
 async def handle_file_upload(
     message: Message,
@@ -147,20 +176,53 @@ async def handle_file_upload(
     file_service: FileService,
     auth_service: AuthService,
     api_service: ApiService,
+    container_service: ContainerService,
     cen: ContextEngine,
 ):
     if not message.document:
         return {
-            "context": await cen.get("file_upload", error="Please send a document file")
+            "context": await cen.get("file_upload", error="Пожалуйста, отправьте файл")
         }
 
+    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+
+    if containers_result.is_err():
+        return {
+            "context": await cen.get(
+                "file_upload",
+                error="Ошибка при получении контейнеров. Сначала создайте контейнер.",
+            )
+        }
+
+    containers = containers_result.unwrap()
+
+    if not containers:
+        return {
+            "context": await cen.get(
+                "file_upload",
+                error="У вас нет контейнеров. Сначала создайте контейнер командой /container",
+            )
+        }
+
+    container = containers[0]
+
     document = message.document
+
+    max_file_size = 10 * 1024 * 1024  # 10MB
+    if document.file_size and document.file_size > max_file_size:
+        return {
+            "context": await cen.get(
+                "file_upload",
+                error=f"Файл слишком большой. Максимальный размер: {max_file_size // 1024 // 1024}MB",
+            )
+        }
+
     file_data = {
         "id": document.file_id,
-        "name": document.file_name or f"file_{document.file_id}",
+        "container_id": container.id,
+        "name": f"file_{document.file_id}",
         "size": document.file_size,
-        "user_id": user.id,
-        "user": user,
+        "user_id": str(user.id),
         "created_at": datetime.now(),
         "mime_type": document.mime_type or "application/octet-stream",
     }
@@ -171,7 +233,9 @@ async def handle_file_upload(
         error = db_result.unwrap_err()
         Logger.error(f"Error creating file in DB: {error}")
         return {
-            "context": await cen.get("file_upload", error=f"Database error: {error}")
+            "context": await cen.get(
+                "file_upload", error=f"Ошибка базы данных: {error}"
+            )
         }
 
     file = db_result.unwrap()
@@ -182,28 +246,45 @@ async def handle_file_upload(
         file_content = await message.bot.download_file(file_info.file_path)
         content_text = file_content.read().decode("utf-8", errors="ignore")
 
+        Logger.info(
+            f"File info: name={file.name}, size={len(content_text)} bytes, container={container.id}"
+        )
+
         api_result = await api_service.create_file(
-            path=f"/{file.id}_{file.name}",
+            path=file.name,
             content=content_text,
-            user_id=user.id,
-            container_id="container_" + user.id,
+            user_id=str(user.id),
+            container_id=container.id,
         )
 
         if api_result.is_err():
-            Logger.info(f"File content: {content_text}")
+            Logger.info(f"File content preview: {content_text[:200]}...")
             await file_service.delete_file(file.id)
             error = api_result.unwrap_err()
             Logger.error(f"Error uploading to C++ service: {error}")
+
+            error_msg = str(error)
+            if "413" in error_msg:
+                error_msg = f"Файл слишком большой ({len(content_text)} bytes). Попробуйте файл меньшего размера."
+            elif "mimetype" in error_msg.lower():
+                error_msg = "Ошибка связи с сервисом хранения. Попробуйте позже."
+
             return {
-                "context": await cen.get("file_upload", error=f"Storage error: {error}")
+                "context": await cen.get(
+                    "file_upload", error=f"Ошибка загрузки: {error_msg}"
+                )
             }
 
-        return {"context": await cen.get("file_upload", success=True, file=file)}
+        return {
+            "context": await cen.get(
+                "file_upload", success=True, file=file, container_name=container.id
+            )
+        }
 
     except Exception as e:
         await file_service.delete_file(file.id)
         Logger.error(f"Error processing file upload: {e}")
-        return {"context": await cen.get("file_upload", error=f"Processing error: {e}")}
+        return {"context": await cen.get("file_upload", error=f"Ошибка обработки: {e}")}
 
 
 @with_template_engine

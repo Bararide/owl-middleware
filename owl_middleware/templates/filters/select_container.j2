@@ -1,0 +1,15 @@
+{% block content %}
+📁 <b>Выберите контейнер для загрузки файла</b>
+
+{% for container in containers %}
+{{ loop.index }}. <code>{{ container.id }}</code>
+   ├ Память: {{ container.tariff.memory_limit }} MB
+   ├ Хранилище: {{ container.tariff.storage_quota }} MB
+   ├ Файлы: {{ container.tariff.file_limit }}
+   └ Тип: {{ container.type_label.value }}
+
+{% endfor %}
+
+💡 <i>Отправьте файл и укажите номер контейнера:</i>
+<code>/upload 1</code> - для загрузки в первый контейнер
+{% endblock %}

@@ -58,9 +58,14 @@ async def create_container_context(
 
 @register_context("file_upload")
 async def file_upload_context(
-    success: bool = False, error: str = "", file: File = None
+    success: bool = False, error: str = "", file: File = None, container_name: str = ""
 ):
-    return {"success": success, "error": error, "file": file}
+    return {
+        "success": success,
+        "error": error,
+        "file": file,
+        "container_name": container_name,
+    }
 
 
 @register_context("semantic_search")

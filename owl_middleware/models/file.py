@@ -12,3 +12,4 @@ class File(BaseModel):
     size: Optional[int] = None
     mime_type: Optional[str] = None
     created_at: Optional[datetime] = None
+    user_id: Optional[str] = None

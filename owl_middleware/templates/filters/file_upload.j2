@@ -1,15 +1,16 @@
 {% block content %}
-{{ "File upload" | bold }}
+{{ "Загрузка файла" | bold }}
 
 {% if success %}
-✅ File uploaded successfully!
-• Name: {{ file.name }}
-• ID: {{ file.id }}
-• Size: {{ file.size }} bytes
+✅ Файл успешно загружен!
+• Имя: {{ file.name }}
+• ID: <code>{{ file.id }}</code>
+• Размер: {{ file.size | filesizeformat }}
+• Контейнер: <code>{{ container_name }}</code>
 {% elif error %}
-❌ Error: {{ error }}
+❌ Ошибка: {{ error }}
 {% else %}
-Please send a file to upload...
+Пожалуйста, отправьте файл для загрузки...
 {% endif %}
 
 {% endblock %}

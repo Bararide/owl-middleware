@@ -153,13 +153,46 @@ class ApiService:
         }
 
         try:
-            async with self.session.post("/files/create", json=payload) as response:
-                data = await response.json()
-                return self._handle_response(response, data)
+            async with self.session.post(
+                "/files/create",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+
+                response_text = await response.text()
+                Logger.info(f"Raw response for file create: {response_text}")
+                Logger.info(f"Response status: {response.status}")
+                Logger.info(f"Response headers: {dict(response.headers)}")
+
+                content_size = len(content)
+                Logger.info(f"File content size: {content_size} bytes")
+
+                if response.status == 413:
+                    return Err(Exception(f"File too large: {content_size} bytes"))
+
+                try:
+                    data = json.loads(response_text)
+
+                    if response.status in [200, 201]:
+                        if "data" in data:
+                            return Ok(data["data"])
+                        else:
+                            return Ok(data)
+                    else:
+                        error_msg = data.get("error", f"HTTP error {response.status}")
+                        return Err(Exception(error_msg))
+
+                except json.JSONDecodeError as e:
+                    Logger.error(f"JSON decode error: {e}")
+                    Logger.error(f"Response text that failed to parse: {response_text}")
+                    return Err(Exception(f"Invalid JSON response: {response_text}"))
+
         except aiohttp.ClientError as e:
+            Logger.error(f"HTTP client error: {e}")
             return Err(e)
-        except json.JSONDecodeError as e:
-            return Err(Exception(f"Invalid JSON response: {e}"))
+        except Exception as e:
+            Logger.error(f"Unexpected error in create_file: {e}")
+            return Err(e)
 
     @result_try
     async def semantic_search(
