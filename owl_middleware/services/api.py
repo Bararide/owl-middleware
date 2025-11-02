@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from fastbot.logger.logger import Logger
 from pampy import _, match
 
-from models import File, User, Tariff, Label
+from models import File, User, Tariff, Label, Container
 from fastbot.core import Result, result_try, Err, Ok
 
 
@@ -196,16 +196,23 @@ class ApiService:
 
     @result_try
     async def semantic_search(
-        self, query: str, limit: int = 5
+        self, query: str, user: User, container: Container, limit: int = 5
     ) -> Result[Dict[str, Any], Exception]:
         connect_result = await self.connect()
         if connect_result.is_err():
             return connect_result
 
-        payload = {"query": query, "limit": limit}
+        payload = {
+            "query": query,
+            "limit": limit,
+            "user_id": str(user.id),
+            "container_id": str(container.id),
+        }
 
         try:
-            async with self.session.post("/semantic", json=payload) as response:
+            async with self.session.post(
+                "containers/semantic", json=payload
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     if "data" in data:
@@ -331,23 +338,3 @@ class ApiService:
     ) -> Result[Dict[str, Any], Exception]:
         path = f"/{file.id}_{file.name}" if file.name else f"/{file.id}"
         return await self.create_file(path, content)
-
-    @result_try
-    async def get_files_for_user(
-        self, user: User
-    ) -> Result[List[Dict[str, Any]], Exception]:
-        search_query = f"user:{user.id} {user.username if user.username else ''}"
-
-        search_result = await self.semantic_search(search_query, limit=100)
-
-        if search_result.is_err():
-            return search_result
-
-        search_data = search_result.unwrap()
-
-        if isinstance(search_data, dict) and "results" in search_data:
-            return Ok(search_data["results"])
-        elif isinstance(search_data, list):
-            return Ok(search_data)
-        else:
-            return Ok([])

@@ -296,6 +296,7 @@ async def handle_search(
     ten: TemplateEngine,
     file_service: FileService,
     auth_service: AuthService,
+    container_service: ContainerService,
     api_service: ApiService,
     cen: ContextEngine,
 ):
@@ -309,7 +310,16 @@ async def handle_search(
             )
         }
 
-    search_result = await api_service.semantic_search(query, limit=10)
+    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+
+    Logger.info(containers_result.unwrap())
+
+    search_result = await api_service.semantic_search(
+        query,
+        user,
+        containers_result.unwrap()[0],
+        limit=10,
+    )
 
     if search_result.is_err():
         error = search_result.unwrap_err()
