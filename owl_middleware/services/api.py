@@ -259,6 +259,37 @@ class ApiService:
             return Err(Exception(f"Invalid JSON response: {e}"))
 
     @result_try
+    async def get_file_content(
+        self, file_id: str, container_id: str
+    ) -> Result[str, Exception]:
+        connect_result = await self.connect()
+        if connect_result.is_err():
+            return connect_result
+
+        payload = {"file_id": file_id, "container_id": container_id}
+
+        try:
+            async with self.session.get(
+                "/files/read",
+                json=payload,
+                headers={"Content-Type", "application/json"},
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if "data" in data:
+                        return Ok(data["data"])
+                    else:
+                        return Ok(data)
+                else:
+                    error_data = await response.json()
+                    error_msg = error_data.get("error", f"HTTP error {response.status}")
+                    return Err(Exception(error_msg))
+        except aiohttp.ClientError as e:
+            return Err(e)
+        except json.JSONDecodeError as e:
+            return Err(Exception(f"Invalid JSON response: {e}"))
+
+    @result_try
     async def get_root(self) -> Result[Dict[str, Any], Exception]:
         connect_result = await self.connect()
         if connect_result.is_err():

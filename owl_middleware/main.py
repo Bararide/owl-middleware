@@ -105,6 +105,7 @@ async def main() -> None:
             resolvers.list_files_context,
             resolvers.create_container_context,
             resolvers.create_container_help_context,
+            resolvers.read_file_impl_context,
         ]
     )
 
@@ -113,7 +114,7 @@ async def main() -> None:
         ("register", handlers.cmd_register, "Зарегистрироваться в системе"),
         ("upload", handlers.handle_file_upload, "Загрузить файл"),
         ("search", handlers.handle_search, "Семантический поиск"),
-        ("read", handlers.handle_read_file, "Прочитать файл"),
+        ("read", handlers.handle_read_file_impl, "Прочитать файл"),
         ("rebuild_index", handlers.handle_rebuild_index, "Перестроить индекс"),
         ("health", handlers.handle_health_check, "Проверить состояние сервиса"),
         ("list", handlers.handle_list_files, "Список загруженных файлов"),

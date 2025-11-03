@@ -31,6 +31,11 @@ async def file_list_context(files: list[File]):
     return {"files": files}
 
 
+@register_context("read_file.j2")
+async def read_file_impl_context(content: str):
+    return {"content": content}
+
+
 @register_context("create_container_help")
 async def create_container_help_context(user_id: str = ""):
     return {"user_id": user_id}

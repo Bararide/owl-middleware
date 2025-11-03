@@ -387,6 +387,48 @@ async def handle_read_file(
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
+@with_auto_reply("commands/read_file_impl.j2")
+async def handle_read_file_impl(
+    message: Message,
+    user: User,
+    ten: TemplateEngine,
+    api_service: ApiService,
+    cen: ContextEngine,
+):
+    args = message.text.split()[1:]
+
+    if not args:
+        return {
+            "context": await cen.get(
+                "read_file",
+                error="Использование: /read_file <file_id> /container_id <container_id>",
+            )
+        }
+
+    file_id = args[0]
+    container_id = args[1]
+
+    content_result = await api_service.get_file_content(file_id, container_id)
+
+    if content_result.is_err():
+        error = content_result.unsrap_err()
+        Logger.error(f"Error read file: {error}")
+        return {
+            "context": await cen.get("read_file", error=f"Ошибка чтения файла: {error}")
+        }
+
+    content = content_result.unwrap()
+
+    return {
+        "context": await cen.get(
+            "read_file",
+            content=content,
+        )
+    }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
 @with_auto_reply("commands/rebuild_index.j2")
 async def handle_rebuild_index(
     message: Message,
