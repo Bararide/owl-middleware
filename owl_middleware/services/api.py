@@ -272,7 +272,7 @@ class ApiService:
             async with self.session.get(
                 "/files/read",
                 json=payload,
-                headers={"Content-Type", "application/json"},
+                headers={"Content-Type": "application/json"},
             ) as response:
                 if response.status == 200:
                     data = await response.json()
