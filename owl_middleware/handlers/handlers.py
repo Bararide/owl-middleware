@@ -408,10 +408,10 @@ async def handle_read_file_impl(
     file_id = args[0]
     container_id = args[1]
 
-    content_result = await api_service.get_file_content(file_id, container_id)
+    content_result = await api_service.get_file_content(str(file_id), str(container_id))
 
     if content_result.is_err():
-        error = content_result.unsrap_err()
+        error = content_result.unwrap_err()
         Logger.error(f"Error read file: {error}")
         return {
             "context": await cen.get("read_file", error=f"Ошибка чтения файла: {error}")
