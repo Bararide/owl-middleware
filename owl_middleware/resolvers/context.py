@@ -31,9 +31,9 @@ async def file_list_context(files: list[File]):
     return {"files": files}
 
 
-@register_context("read_file_impl.j2")
-async def read_file_impl_context(content: str):
-    return {"content": content}
+@register_context("read_file_impl")
+async def read_file_impl_context(content: str, truncated: str):
+    return {"content": content, "truncated": truncated}
 
 
 @register_context("create_container_help")

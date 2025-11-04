@@ -419,10 +419,17 @@ async def handle_read_file_impl(
 
     content = content_result.unwrap()
 
+    max_length = 3000
+    if len(content) > max_length:
+        content = (
+            content[:max_length] + "\n\n... (сообщение обрезано, файл слишком большой)"
+        )
+
     return {
         "context": await cen.get(
-            "read_file",
+            "read_file_impl",
             content=content,
+            truncated=len(content_result.unwrap()) > max_length,
         )
     }
 
