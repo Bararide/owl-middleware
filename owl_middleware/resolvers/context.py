@@ -32,8 +32,15 @@ async def file_list_context(files: list[File]):
 
 
 @register_context("read_file_impl")
-async def read_file_impl_context(content: str, truncated: str):
-    return {"content": content, "truncated": truncated}
+async def read_file_impl_context(
+    content: str, truncated: str, error: str, is_binary: bool
+):
+    return {
+        "content": content,
+        "truncated": truncated,
+        "error": error,
+        "is_binary": is_binary,
+    }
 
 
 @register_context("create_container_help")

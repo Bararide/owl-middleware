@@ -421,6 +421,25 @@ async def handle_read_file_impl(
 
     content = content_result.unwrap()
 
+    def is_binary_content(text):
+        if text.startswith("%PDF-"):
+            return True
+        non_ascii_count = sum(1 for char in text if ord(char) > 127)
+        if len(text) > 100 and non_ascii_count / len(text) > 0.3:
+            return True
+        return False
+
+    if is_binary_content(content):
+        return {
+            "context": await cen.get(
+                "read_file_impl",
+                content="",
+                truncated="",
+                error="Файл имеет бинарный формат (PDF или другой). Просмотр содержимого невозможен.",
+                is_binary=True,
+            )
+        }
+
     content = html.escape(content)
 
     max_length = 3000
@@ -434,6 +453,8 @@ async def handle_read_file_impl(
             "read_file_impl",
             content=content,
             truncated=len(content_result.unwrap()) > max_length,
+            error="",
+            is_binary=False,
         )
     }
 
