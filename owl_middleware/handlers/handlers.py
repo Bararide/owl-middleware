@@ -13,6 +13,8 @@ from fastbot.decorators import (
     with_auto_reply,
 )
 
+import html
+
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
@@ -418,6 +420,8 @@ async def handle_read_file_impl(
         }
 
     content = content_result.unwrap()
+
+    content = html.escape(content)
 
     max_length = 3000
     if len(content) > max_length:
