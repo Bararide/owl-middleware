@@ -14,6 +14,7 @@ from fastbot.decorators import (
 )
 
 import html
+import fitz
 
 
 @with_template_engine
@@ -210,7 +211,7 @@ async def handle_file_upload(
 
     document = message.document
 
-    max_file_size = 10 * 1024 * 1024  # 10MB
+    max_file_size = 10 * 1024 * 1024
     if document.file_size and document.file_size > max_file_size:
         return {
             "context": await cen.get(
@@ -222,7 +223,7 @@ async def handle_file_upload(
     file_data = {
         "id": document.file_id,
         "container_id": container.id,
-        "name": f"file_{document.file_id}",
+        "name": document.file_name or f"file_{document.file_id}",
         "size": document.file_size,
         "user_id": str(user.id),
         "created_at": datetime.now(),
@@ -244,30 +245,41 @@ async def handle_file_upload(
 
     try:
         file_info = await message.bot.get_file(document.file_id)
-
         file_content = await message.bot.download_file(file_info.file_path)
-        content_text = file_content.read().decode("utf-8", errors="ignore")
+
+        binary_content = file_content.read()
 
         Logger.info(
-            f"File info: name={file.name}, size={len(content_text)} bytes, container={container.id}"
+            f"File info: name={file.name}, size={len(binary_content)} bytes, container={container.id}"
         )
 
-        api_result = await api_service.create_file(
-            path=file.name,
-            content=content_text,
-            user_id=str(user.id),
-            container_id=container.id,
-        )
+        if document.mime_type and document.mime_type.startswith("text/"):
+            content_text = binary_content.decode("utf-8", errors="ignore")
+            api_result = await api_service.create_file(
+                path=file.name,
+                content=content_text,
+                user_id=str(user.id),
+                container_id=container.id,
+            )
+        else:
+            import base64
+
+            content_base64 = base64.b64encode(binary_content).decode("ascii")
+            api_result = await api_service.create_file(
+                path=file.name,
+                content=content_base64,
+                user_id=str(user.id),
+                container_id=container.id,
+            )
 
         if api_result.is_err():
-            Logger.info(f"File content preview: {content_text[:200]}...")
             await file_service.delete_file(file.id)
             error = api_result.unwrap_err()
             Logger.error(f"Error uploading to C++ service: {error}")
 
             error_msg = str(error)
             if "413" in error_msg:
-                error_msg = f"Файл слишком большой ({len(content_text)} bytes). Попробуйте файл меньшего размера."
+                error_msg = f"Файл слишком большой ({len(binary_content)} bytes). Попробуйте файл меньшего размера."
             elif "mimetype" in error_msg.lower():
                 error_msg = "Ошибка связи с сервисом хранения. Попробуйте позже."
 
@@ -421,32 +433,63 @@ async def handle_read_file_impl(
 
     content = content_result.unwrap()
 
-    def is_binary_content(text):
-        if text.startswith("%PDF-"):
-            return True
-        non_ascii_count = sum(1 for char in text if ord(char) > 127)
-        if len(text) > 100 and non_ascii_count / len(text) > 0.3:
-            return True
-        return False
+    if content.startswith("%PDF-"):
+        try:
+            pdf_bytes = content.encode("latin-1")
 
-    if is_binary_content(content):
-        return {
-            "context": await cen.get(
-                "read_file_impl",
-                content="",
-                truncated="",
-                error="Файл имеет бинарный формат (PDF или другой). Просмотр содержимого невозможен.",
-                is_binary=True,
-            )
-        }
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+            extracted_text = ""
+            for page_num in range(pdf_document.page_count):
+                page = pdf_document.load_page(page_num)
+                extracted_text += page.get_text() + "\n\n"
+
+            pdf_document.close()
+
+            if extracted_text.strip():
+                import html
+
+                content = html.escape(extracted_text.strip())
+
+                max_length = 3000
+                if len(content) > max_length:
+                    content = content[:max_length] + "\n\n... (текст обрезан)"
+
+                return {
+                    "context": await cen.get(
+                        "read_file_impl",
+                        content=content,
+                        truncated=len(extracted_text) > max_length,
+                        is_pdf=True,
+                    )
+                }
+            else:
+                return {
+                    "context": await cen.get(
+                        "read_file_impl",
+                        content="",
+                        error="PDF файл не содержит извлекаемого текста (возможно, это сканированное изображение)",
+                        is_pdf=True,
+                    )
+                }
+
+        except Exception as e:
+            Logger.error(f"PDF extraction error: {e}")
+            return {
+                "context": await cen.get(
+                    "read_file_impl",
+                    content="",
+                    truncated="",
+                    error=f"Ошибка извлечения текста из PDF: {str(e)}",
+                    is_pdf=True,
+                )
+            }
 
     content = html.escape(content)
 
     max_length = 3000
     if len(content) > max_length:
-        content = (
-            content[:max_length] + "\n\n... (сообщение обрезано, файл слишком большой)"
-        )
+        content = content[:max_length] + "\n\n... (сообщение обрезано)"
 
     return {
         "context": await cen.get(
@@ -454,7 +497,7 @@ async def handle_read_file_impl(
             content=content,
             truncated=len(content_result.unwrap()) > max_length,
             error="",
-            is_binary=False,
+            is_pdf=False,
         )
     }
 

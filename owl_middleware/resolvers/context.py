@@ -33,13 +33,13 @@ async def file_list_context(files: list[File]):
 
 @register_context("read_file_impl")
 async def read_file_impl_context(
-    content: str, truncated: str, error: str, is_binary: bool
+    content: str, truncated: str, error: str, is_pdf: bool
 ):
     return {
         "content": content,
         "truncated": truncated,
         "error": error,
-        "is_binary": is_binary,
+        "is_pdf": is_pdf,
     }
 
 
