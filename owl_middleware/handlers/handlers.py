@@ -282,7 +282,7 @@ async def handle_file_upload(
                 }
 
             api_result = await api_service.create_file(
-                path=file.name,
+                path=file.id,
                 content=extracted_text,
                 user_id=str(user.id),
                 container_id=container.id,
@@ -291,7 +291,7 @@ async def handle_file_upload(
         elif document.mime_type and document.mime_type.startswith("text/"):
             content_text = binary_content.decode("utf-8", errors="ignore")
             api_result = await api_service.create_file(
-                path=file.name,
+                path=file.id,
                 content=content_text,
                 user_id=str(user.id),
                 container_id=container.id,
