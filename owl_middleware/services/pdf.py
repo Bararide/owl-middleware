@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 
 import fitz
 import base64
+import io
 
 
 class TextServiceConfig(BaseModel):
@@ -20,10 +21,20 @@ class TextService:
         self._config = TextServiceConfig(max_file_size=max_file_size)
 
     @result_try
-    async def extract_text_from_pdf(file) -> Result[str, Exception]:
+    async def extract_text_from_pdf(
+        self, file=None, stream=None
+    ) -> Result[str, Exception]:
         text = ""
         try:
-            with fitz.open(file) as doc:
+            if stream is not None:
+                file_stream = io.BytesIO(stream)
+                doc = fitz.open(stream=file_stream)
+            elif file is not None:
+                doc = fitz.open(file)
+            else:
+                return Err(ValueError("Either file or stream must be provided"))
+
+            with doc:
                 for page in doc:
                     text += page.get_text()
             return Ok(text)

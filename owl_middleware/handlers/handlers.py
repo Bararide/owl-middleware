@@ -6,7 +6,7 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
-from services import AuthService, FileService, ApiService, ContainerService
+from services import AuthService, FileService, ApiService, ContainerService, TextService
 from fastbot.decorators import (
     with_template_engine,
     with_parse_mode,
@@ -180,6 +180,7 @@ async def handle_file_upload(
     auth_service: AuthService,
     api_service: ApiService,
     container_service: ContainerService,
+    text_service: TextService,
     cen: ContextEngine,
 ):
     if not message.document:
@@ -211,19 +212,18 @@ async def handle_file_upload(
 
     document = message.document
 
-    max_file_size = 10 * 1024 * 1024
-    if document.file_size and document.file_size > max_file_size:
+    if document.file_size and document.file_size > text_service.max_file_size:
         return {
             "context": await cen.get(
                 "file_upload",
-                error=f"Файл слишком большой. Максимальный размер: {max_file_size // 1024 // 1024}MB",
+                error=f"Файл слишком большой. Максимальный размер: {text_service.max_file_size // 1024 // 1024}MB",
             )
         }
 
     file_data = {
         "id": document.file_id,
         "container_id": container.id,
-        "name": f"file_{document.file_id}",
+        "name": document.file_name or f"file_{document.file_id}",
         "size": document.file_size,
         "user_id": str(user.id),
         "created_at": datetime.now(),
@@ -250,10 +250,45 @@ async def handle_file_upload(
         binary_content = file_content.read()
 
         Logger.info(
-            f"File info: name={file.name}, size={len(binary_content)} bytes, container={container.id}"
+            f"File info: name={file.name}, size={len(binary_content)} bytes, container={container.id}, mime_type={document.mime_type}"
         )
 
-        if document.mime_type and document.mime_type.startswith("text/"):
+        if document.mime_type == "application/pdf":
+            text_result = await text_service.extract_text_from_pdf(
+                stream=binary_content
+            )
+
+            if text_result.is_err():
+                await file_service.delete_file(file.id)
+                error = text_result.unwrap_err()
+                Logger.error(f"Error extracting text from PDF: {error}")
+                return {
+                    "context": await cen.get(
+                        "file_upload",
+                        error=f"Ошибка извлечения текста из PDF: {str(error)}",
+                    )
+                }
+
+            extracted_text = text_result.unwrap()
+            Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
+
+            if not extracted_text.strip():
+                await file_service.delete_file(file.id)
+                return {
+                    "context": await cen.get(
+                        "file_upload",
+                        error="Не удалось извлечь текст из PDF файла. Файл может быть сканом или защищенным.",
+                    )
+                }
+
+            api_result = await api_service.create_file(
+                path=file.name,
+                content=extracted_text,
+                user_id=str(user.id),
+                container_id=container.id,
+            )
+
+        elif document.mime_type and document.mime_type.startswith("text/"):
             content_text = binary_content.decode("utf-8", errors="ignore")
             api_result = await api_service.create_file(
                 path=file.name,
@@ -264,7 +299,7 @@ async def handle_file_upload(
         else:
             content_base64 = base64.b64encode(binary_content).decode("ascii")
             api_result = await api_service.create_file(
-                path=file.name,
+                path=file.id,
                 content=content_base64,
                 user_id=str(user.id),
                 container_id=container.id,

@@ -74,8 +74,6 @@ async def main() -> None:
         .add_mini_app(mini_app_config)
     )
 
-    services.HanaValidator.create_validated_person()
-
     bot_builder.add_dependency("db", database_service)
     bot_builder.add_dependency("auth_service", auth_service)
     bot_builder.add_dependency("auth_middleware", auth_middleware)
