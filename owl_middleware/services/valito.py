@@ -1,7 +1,3 @@
-import sys
-
-sys.path.append("/lib")
-
 from typing import Dict, Any, List, Optional
 
 import valito
