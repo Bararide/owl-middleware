@@ -14,6 +14,7 @@ from fastbot.decorators import (
 )
 
 import fitz
+import base64
 
 
 @with_template_engine
@@ -261,8 +262,6 @@ async def handle_file_upload(
                 container_id=container.id,
             )
         else:
-            import base64
-
             content_base64 = base64.b64encode(binary_content).decode("ascii")
             api_result = await api_service.create_file(
                 path=file.name,
@@ -409,6 +408,7 @@ async def handle_read_file_impl(
     cen: ContextEngine,
 ):
     import html
+    import base64
 
     args = message.text.split()[1:]
 
@@ -434,21 +434,40 @@ async def handle_read_file_impl(
 
     content = content_result.unwrap()
 
-    if content.startswith("%PDF-"):
+    def is_base64_encoded(s):
         try:
-            pdf_bytes = content.encode("latin-1")
+            if len(s) > 100 and all(
+                c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+                for c in s[:100]
+            ):
+                decoded = base64.b64decode(s[:100])
+                return True
+            return False
+        except:
+            return False
+
+    if content.startswith("%PDF-") or (
+        is_base64_encoded(content)
+        and base64.b64decode(content[:20]).startswith(b"%PDF-")
+    ):
+        try:
+            if is_base64_encoded(content):
+                pdf_bytes = base64.b64decode(content)
+            else:
+                pdf_bytes = content.encode("latin-1")
 
             pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
 
             extracted_text = ""
             for page_num in range(pdf_document.page_count):
                 page = pdf_document.load_page(page_num)
-                extracted_text += page.get_text() + "\n\n"
+                page_text = page.get_text()
+                if page_text:
+                    extracted_text += page_text + "\n\n"
 
             pdf_document.close()
 
             if extracted_text.strip():
-                # УБЕРИТЕ импорт html отсюда, так как он уже в начале функции
                 content = html.escape(extracted_text.strip())
 
                 max_length = 3000
@@ -460,6 +479,7 @@ async def handle_read_file_impl(
                         "read_file_impl",
                         content=content,
                         truncated=len(extracted_text) > max_length,
+                        error="0",
                         is_pdf=True,
                     )
                 }
@@ -468,6 +488,7 @@ async def handle_read_file_impl(
                     "context": await cen.get(
                         "read_file_impl",
                         content="",
+                        truncated="",
                         error="PDF файл не содержит извлекаемого текста (возможно, это сканированное изображение)",
                         is_pdf=True,
                     )

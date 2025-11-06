@@ -62,6 +62,7 @@ async def main() -> None:
     auth_service = services.AuthService(database_service)
     file_service = services.FileService(database_service, api_service)
     container_service = services.ContainerService(database_service, api_service)
+    text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
@@ -73,6 +74,8 @@ async def main() -> None:
         .add_mini_app(mini_app_config)
     )
 
+    services.HanaValidator.create_validated_person()
+
     bot_builder.add_dependency("db", database_service)
     bot_builder.add_dependency("auth_service", auth_service)
     bot_builder.add_dependency("auth_middleware", auth_middleware)
@@ -81,6 +84,7 @@ async def main() -> None:
     bot_builder.add_dependency("template_engine", template_service)
     bot_builder.add_dependency("context_engine", context_service)
     bot_builder.add_dependency("container_service", container_service)
+    bot_builder.add_dependency("text_service", text_service)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)
