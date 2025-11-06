@@ -13,7 +13,6 @@ from fastbot.decorators import (
     with_auto_reply,
 )
 
-import html
 import fitz
 
 
@@ -223,7 +222,7 @@ async def handle_file_upload(
     file_data = {
         "id": document.file_id,
         "container_id": container.id,
-        "name": document.file_name or f"file_{document.file_id}",
+        "name": f"file_{document.file_id}",
         "size": document.file_size,
         "user_id": str(user.id),
         "created_at": datetime.now(),
@@ -409,6 +408,8 @@ async def handle_read_file_impl(
     api_service: ApiService,
     cen: ContextEngine,
 ):
+    import html
+
     args = message.text.split()[1:]
 
     if not args:
@@ -447,8 +448,7 @@ async def handle_read_file_impl(
             pdf_document.close()
 
             if extracted_text.strip():
-                import html
-
+                # УБЕРИТЕ импорт html отсюда, так как он уже в начале функции
                 content = html.escape(extracted_text.strip())
 
                 max_length = 3000
