@@ -11,7 +11,6 @@ from .handlers import (
     handle_create_container,
     handle_read_file_impl,
     handle_download_file,
-    handle_download_file_with_template,
     handle_select_container,
 )
 
@@ -29,6 +28,5 @@ __all__ = [
     "handle_create_container",
     "handle_read_file_impl",
     "handle_download_file",
-    "handle_download_file_with_template",
     "handle_select_container",
 ]

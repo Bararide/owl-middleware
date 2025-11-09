@@ -88,6 +88,7 @@ async def download_file_context(
     error: str = "",
     files: List[File] = None,
     files_count: int = 0,
+    container_id: str = "",
 ):
     if files is None:
         files = []
@@ -102,29 +103,7 @@ async def download_file_context(
         "has_files": files_count > 0,
         "size_kb": size / 1024 if size > 0 else 0,
         "size_mb": size / (1024 * 1024) if size > 0 else 0,
-    }
-
-
-@register_context("file_download")
-async def file_download_context(
-    file: File = None,
-    content: str = "",
-    download_filename: str = "",
-    error: str = "",
-    is_binary: bool = False,
-):
-    if file is None:
-        file = File()
-
-    return {
-        "file": file,
-        "content": content,
-        "download_filename": download_filename,
-        "error": error,
-        "is_binary": is_binary,
-        "has_content": bool(content.strip()),
-        "content_length": len(content),
-        "can_download": bool(content.strip()) and not error,
+        "container_id": container_id,
     }
 
 
