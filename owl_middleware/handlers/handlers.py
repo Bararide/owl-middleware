@@ -13,8 +13,224 @@ from fastbot.decorators import (
     with_auto_reply,
 )
 
+from aiogram.types import BufferedInputFile
+
 import fitz
 import base64
+
+import tempfile
+import os
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
+@with_auto_reply("commands/download_file.j2")
+async def handle_download_file_with_template(
+    message: Message,
+    user: User,
+    ten: TemplateEngine,
+    file_service: FileService,
+    api_service: ApiService,
+    container_service: ContainerService,
+    cen: ContextEngine,
+):
+    args = message.text.split()[1:]
+
+    if not args:
+        containers_result = await container_service.get_containers_by_user_id(
+            str(user.id)
+        )
+
+        if containers_result.is_err():
+            return {
+                "context": await cen.get(
+                    "download_file", error="Ошибка при получении контейнеров"
+                )
+            }
+
+        containers = containers_result.unwrap()
+
+        if not containers:
+            return {
+                "context": await cen.get(
+                    "download_file",
+                    error="У вас нет контейнеров. Сначала создайте контейнер командой /container",
+                )
+            }
+
+        all_files = []
+        for container in containers:
+            files_result = await file_service.get_files_by_container(container.id)
+            if files_result.is_ok():
+                container_files = files_result.unwrap()
+                for file in container_files:
+                    file.container_name = container.id
+                all_files.extend(container_files)
+
+        if not all_files:
+            return {
+                "context": await cen.get(
+                    "download_file",
+                    error="У вас нет загруженных файлов. Сначала загрузите файлы с помощью команды /upload",
+                )
+            }
+
+        return {
+            "context": await cen.get(
+                "download_file", files=all_files, files_count=len(all_files)
+            )
+        }
+
+    file_identifier = args[0]
+    custom_filename = args[1] if len(args) > 1 else None
+
+    file_result = await file_service.get_file(file_identifier)
+    if file_result.is_ok() and file_result.unwrap():
+        file = file_result.unwrap()
+        path = f"/{file.id}_{file.name}"
+        original_filename = file.name
+
+        if file.user_id != str(user.id) and not user.is_admin:
+            return {
+                "context": await cen.get(
+                    "download_file", error="У вас нет прав для скачивания этого файла"
+                )
+            }
+    else:
+        path = file_identifier
+        original_filename = (
+            file_identifier.split("/")[-1]
+            if "/" in file_identifier
+            else file_identifier
+        )
+
+    read_result = await api_service.read_file(path)
+
+    if read_result.is_err():
+        error = read_result.unwrap_err()
+        Logger.error(f"Download file error: {error}")
+        return {
+            "context": await cen.get(
+                "download_file", error=f"Ошибка при чтении файла: {error}"
+            )
+        }
+
+    file_data = read_result.unwrap()
+    content = file_data.get("content", "")
+
+    if not content:
+        return {
+            "context": await cen.get(
+                "download_file", error="Файл пуст или не содержит данных"
+            )
+        }
+
+    download_filename = custom_filename or original_filename
+
+    try:
+        from aiogram.types import BufferedInputFile
+
+        try:
+            binary_content = base64.b64decode(content)
+            file_data_to_send = binary_content
+            is_binary = True
+        except:
+            file_data_to_send = content.encode("utf-8")
+            is_binary = False
+
+        file_to_send = BufferedInputFile(file_data_to_send, filename=download_filename)
+
+        await message.answer_document(
+            document=file_to_send,
+            caption=f"📎 Файл: {download_filename}\n"
+            f"📊 Размер: {len(file_data_to_send)} байт\n"
+            f"🔧 Тип: {'Бинарный' if is_binary else 'Текстовый'}",
+        )
+
+        Logger.info(
+            f"File downloaded successfully: {download_filename} by user {user.id}"
+        )
+
+        return {
+            "context": await cen.get(
+                "download_file",
+                success=True,
+                filename=download_filename,
+                size=len(file_data_to_send),
+            )
+        }
+
+    except Exception as e:
+        Logger.error(f"Error creating/downloading file: {e}")
+        return {
+            "context": await cen.get(
+                "download_file",
+                error=f"Ошибка при создании файла для скачивания: {str(e)}",
+            )
+        }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
+async def handle_download_file(
+    message: Message,
+    user: User,
+    ten: TemplateEngine,
+    api_service: ApiService,
+    cen: ContextEngine,
+):
+    args = message.text.split()[1:]
+
+    if not args:
+        return await message.answer(
+            "Использование: /download_file <file_id> /container_id <container_id>\n\n"
+            "Пример:\n"
+            "/download_file /BQACAgIAAxkBAAICOmkQr6T87T3mKDnh6Uu3T_LSNPxiAAIEjQAC1H2JSGn55jqZTMV_NgQ2 dev_env"
+        )
+
+    file_id = args[0]
+    container_id = args[1]
+
+    content_result = await api_service.get_file_content(str(file_id), str(container_id))
+
+    if content_result.is_err():
+        error = content_result.unwrap_err()
+        Logger.error(f"Error download file: {error}")
+        return await message.answer(f"❌ Ошибка чтения файла: {error}")
+
+    content = content_result.unwrap()
+
+    try:
+        from aiogram.types import BufferedInputFile
+
+        download_filename = f"file_{file_id}.txt"
+
+        try:
+            binary_content = base64.b64decode(content)
+            file_data_to_send = binary_content
+            file_type = "бинарный"
+            download_filename = f"file_{file_id}.bin"
+        except:
+            file_data_to_send = content.encode("utf-8")
+            file_type = "текстовый"
+
+        file_to_send = BufferedInputFile(file_data_to_send, filename=download_filename)
+
+        await message.answer_document(
+            document=file_to_send,
+            caption=f"📎 Файл из контейнера {container_id}\n"
+            f"📦 {len(file_data_to_send)} байт\n"
+            f"🔧 {file_type}",
+        )
+
+        await message.answer(f"✅ Файл успешно скачан")
+        Logger.info(
+            f"File downloaded: {file_id} from container {container_id} by user {user.id}"
+        )
+
+    except Exception as e:
+        Logger.error(f"Download error: {e}")
+        await message.answer(f"❌ Ошибка при скачивании: {str(e)}")
 
 
 @with_template_engine

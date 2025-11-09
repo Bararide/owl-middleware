@@ -80,6 +80,104 @@ async def file_upload_context(
     }
 
 
+@register_context("download_file")
+async def download_file_context(
+    success: bool = False,
+    filename: str = "",
+    size: int = 0,
+    error: str = "",
+    files: List[File] = None,
+    files_count: int = 0,
+):
+    if files is None:
+        files = []
+
+    return {
+        "success": success,
+        "filename": filename,
+        "size": size,
+        "error": error,
+        "files": files,
+        "files_count": files_count,
+        "has_files": files_count > 0,
+        "size_kb": size / 1024 if size > 0 else 0,
+        "size_mb": size / (1024 * 1024) if size > 0 else 0,
+    }
+
+
+@register_context("file_download")
+async def file_download_context(
+    file: File = None,
+    content: str = "",
+    download_filename: str = "",
+    error: str = "",
+    is_binary: bool = False,
+):
+    if file is None:
+        file = File()
+
+    return {
+        "file": file,
+        "content": content,
+        "download_filename": download_filename,
+        "error": error,
+        "is_binary": is_binary,
+        "has_content": bool(content.strip()),
+        "content_length": len(content),
+        "can_download": bool(content.strip()) and not error,
+    }
+
+
+@register_context("download_selection")
+async def download_selection_context(
+    containers: List[Any] = None,
+    files: List[File] = None,
+    selected_container: str = "",
+    error: str = "",
+):
+    if containers is None:
+        containers = []
+    if files is None:
+        files = []
+
+    return {
+        "containers": containers,
+        "files": files,
+        "selected_container": selected_container,
+        "error": error,
+        "has_containers": len(containers) > 0,
+        "has_files": len(files) > 0,
+        "containers_count": len(containers),
+        "files_count": len(files),
+        "total_files_size": sum(file.size for file in files if file.size),
+    }
+
+
+@register_context("file_preview")
+async def file_preview_context(
+    file: File = None,
+    preview_content: str = "",
+    full_content: str = "",
+    error: str = "",
+    is_truncated: bool = False,
+    max_preview_length: int = 500,
+):
+    if file is None:
+        file = File()
+
+    return {
+        "file": file,
+        "preview_content": preview_content,
+        "full_content": full_content,
+        "error": error,
+        "is_truncated": is_truncated,
+        "max_preview_length": max_preview_length,
+        "has_preview": bool(preview_content.strip()),
+        "has_full_content": bool(full_content.strip()),
+        "can_download_full": bool(full_content.strip()) and not error,
+    }
+
+
 @register_context("semantic_search")
 async def semantic_search_context(
     query: str = "",

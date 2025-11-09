@@ -108,6 +108,10 @@ async def main() -> None:
             resolvers.create_container_context,
             resolvers.create_container_help_context,
             resolvers.read_file_impl_context,
+            resolvers.download_selection_context,
+            resolvers.download_file_context,
+            resolvers.file_download_context,
+            resolvers.file_preview_context,
         ]
     )
 
@@ -123,6 +127,7 @@ async def main() -> None:
         ("delete", handlers.handle_delete_file, "Удалить файл"),
         ("status", handlers.handle_service_status, "Статус сервиса"),
         ("container", handlers.handle_create_container, "Создание контейнера"),
+        ("download", handlers.handle_download_file_with_template, "Скачать файл"),
     ]
 
     for cmd, handler, desc in command_handlers:
