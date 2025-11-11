@@ -152,11 +152,15 @@ async def main() -> None:
 
     bot = bot_builder.build()
 
-    bot.app.state.template_service = template_service
-    bot.app.state.context_sevice = context_service
+    bot.app.state.db = database_service
+    bot.app.state.auth_service = auth_service
+    bot.app.state.auth_middleware = auth_middleware
     bot.app.state.api_service = api_service
+    bot.app.state.file_service = file_service
+    bot.app.state.template_service = template_service
+    bot.app.state.context_service = context_service
     bot.app.state.container_service = container_service
-    bot.app.state.auth_servcie = auth_service
+    bot.app.state.text_service = text_service
     bot.app.state.user_resolver = resolvers.resolve_user
 
     use_webhook = getenv("USE_WEBHOOK", "").lower() == "true"

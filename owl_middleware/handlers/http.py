@@ -13,30 +13,17 @@ import json
 from datetime import datetime
 
 from fastbot.decorators import inject
+from fastbot.logger import Logger
 from services import AuthService, FileService, ApiService, ContainerService, TextService
 from models import User, Container as ContainerModel, File as FileModel
 
 http_router = APIRouter()
 
 
-@inject("auth_service")
-async def get_current_user(request: Request, auth_service: AuthService) -> User:
-    user_id = request.headers.get("X-User-ID")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user = await auth_service.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    return user
-
-
 @http_router.get("/containers")
 @inject("container_service")
-async def list_containers(
-    container_service: ContainerService, current_user: User = Depends(get_current_user)
-):
+@inject("user_resolver")
+async def list_containers(container_service: ContainerService, current_user: User):
     containers_result = await container_service.get_containers_by_user_id(
         str(current_user.id)
     )
@@ -71,10 +58,11 @@ async def list_containers(
 
 @http_router.get("/containers/{container_id}")
 @inject("container_service")
+@inject("user_resolver")
 async def get_container(
     container_id: str,
     container_service: ContainerService,
-    current_user: User = Depends(get_current_user),
+    current_user: User,
 ):
     container_result = await container_service.get_container(container_id)
 
@@ -110,11 +98,12 @@ async def get_container(
 @http_router.post("/containers")
 @inject("container_service")
 @inject("api_service")
+@inject("user_resolver")
 async def create_container(
     request: dict,
     container_service: ContainerService,
     api_service: ApiService,
-    current_user: User = Depends(get_current_user),
+    current_user: User,
 ):
     container_data = {
         "user_id": str(current_user.id),
@@ -176,10 +165,11 @@ async def create_container(
 
 @http_router.delete("/containers/{container_id}")
 @inject("container_service")
+@inject("user_resolver")
 async def delete_container(
     container_id: str,
     container_service: ContainerService,
-    current_user: User = Depends(get_current_user),
+    current_user: User,
 ):
     """Delete container"""
     container_result = await container_service.get_container(container_id)
