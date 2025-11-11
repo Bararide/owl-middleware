@@ -37,7 +37,6 @@ async def get_current_user(request: Request, auth_service: AuthService) -> User:
 async def list_containers(
     container_service: ContainerService, current_user: User = Depends(get_current_user)
 ):
-    """Get all containers for current user"""
     containers_result = await container_service.get_containers_by_user_id(
         str(current_user.id)
     )
@@ -77,7 +76,6 @@ async def get_container(
     container_service: ContainerService,
     current_user: User = Depends(get_current_user),
 ):
-    """Get specific container"""
     container_result = await container_service.get_container(container_id)
 
     if container_result.is_err() or not container_result.unwrap():
