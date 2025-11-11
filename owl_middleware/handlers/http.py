@@ -19,5 +19,6 @@ http_router = APIRouter()
 
 
 @http_router.get("/")
-async def health_check(request: Request):
+@inject("api_service")
+async def health_check(request: Request, api_service: ApiService):
     return {"status": "ok", "service": "bot"}
