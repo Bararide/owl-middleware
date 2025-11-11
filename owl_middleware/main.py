@@ -17,6 +17,8 @@ from fastbot.engine import TemplateEngine
 from fastbot import FastBotBuilder, MiniAppConfig
 from fastbot.logger import Logger
 
+from fastapi import APIRouter
+
 import services
 import models
 import resolvers
@@ -146,7 +148,13 @@ async def main() -> None:
 
     await bot_builder.add_handler(handlers.handle_file_upload, F.document)
 
+    bot_builder.add_http_router(handlers.http_router)
+
     bot = bot_builder.build()
+
+    bot.app.state.template_service = template_service
+    bot.app.state.context_sevice = context_service
+    bot.app.state.api_service = api_service
 
     use_webhook = getenv("USE_WEBHOOK", "").lower() == "true"
 

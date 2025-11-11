@@ -14,6 +14,8 @@ from .handlers import (
     handle_select_container,
 )
 
+from .http import http_router
+
 __all__ = [
     "cmd_start",
     "cmd_register",
@@ -29,4 +31,5 @@ __all__ = [
     "handle_read_file_impl",
     "handle_download_file",
     "handle_select_container",
+    "http_router",
 ]
