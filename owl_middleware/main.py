@@ -115,6 +115,7 @@ async def main() -> None:
             resolvers.download_selection_context,
             resolvers.download_file_context,
             resolvers.file_preview_context,
+            resolvers.get_token_context,
         ]
     )
 
@@ -131,6 +132,7 @@ async def main() -> None:
         ("status", handlers.handle_service_status, "Статус сервиса"),
         ("container", handlers.handle_create_container, "Создание контейнера"),
         ("download", handlers.handle_download_file, "Скачать файл"),
+        ("web", handlers.handle_get_token, "Получить токен для web"),
     ]
 
     for cmd, handler, desc in command_handlers:

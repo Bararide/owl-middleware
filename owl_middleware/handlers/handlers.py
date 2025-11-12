@@ -21,6 +21,44 @@ import base64
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
+@with_auto_reply("commands/get_token.j2")
+async def handle_get_token(
+    message: Message,
+    user: User,
+    template_engine: TemplateEngine,
+    auth_service: AuthService,
+    context_engine: ContextEngine,
+):
+    """Генерирует JWT токен для веб-доступа"""
+    try:
+        token = auth_service.generate_jwt_token(user)
+
+        web_url = f"https://your-app.com?token={token}"
+
+        Logger.info(f"Generated JWT token for user {user.id}")
+
+        return {
+            "context": await context_engine.get(
+                "get_token",
+                success=True,
+                token=token,
+                web_url=web_url,
+                user_id=user.id,
+                expires_hours=24,
+            )
+        }
+
+    except Exception as e:
+        Logger.error(f"Error generating token: {e}")
+        return {
+            "context": await context_engine.get(
+                "get_token", success=False, error=f"Ошибка генерации токена: {str(e)}"
+            )
+        }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
 @with_auto_reply("commands/download_file.j2")
 async def handle_download_file(
     message: Message,

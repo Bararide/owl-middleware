@@ -12,6 +12,7 @@ from .handlers import (
     handle_read_file_impl,
     handle_download_file,
     handle_select_container,
+    handle_get_token,
 )
 
 from .http import http_router
@@ -32,4 +33,5 @@ __all__ = [
     "handle_download_file",
     "handle_select_container",
     "http_router",
+    "handle_get_token",
 ]

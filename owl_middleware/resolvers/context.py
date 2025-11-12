@@ -80,6 +80,27 @@ async def file_upload_context(
     }
 
 
+@register_context("get_token")
+async def get_token_context(
+    success: bool = False,
+    token: str = "",
+    web_url: str = "",
+    user_id: int = 0,
+    expires_hours: int = 24,
+    error: str = "",
+):
+    return {
+        "success": success,
+        "token": token,
+        "web_url": web_url,
+        "user_id": user_id,
+        "expires_hours": expires_hours,
+        "error": error,
+        "has_token": bool(token),
+        "token_preview": token[:50] + "..." if len(token) > 50 else token,
+    }
+
+
 @register_context("download_file")
 async def download_file_context(
     success: bool = False,
