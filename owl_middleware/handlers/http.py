@@ -20,6 +20,100 @@ from models import User, Container as ContainerModel, File as FileModel
 http_router = APIRouter()
 
 
+@http_router.post("/auth/register")
+@inject("auth_service")
+async def register_email_user(
+    request: dict,
+    auth_service: AuthService,
+):
+    email = request.get("email")
+    password = request.get("password")
+    first_name = request.get("first_name", "Unknown")
+    last_name = request.get("last_name")
+
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+
+    user_result = await auth_service.register_email_user(
+        email, password, {"first_name": first_name, "last_name": last_name}
+    )
+
+    if user_result.is_err():
+        raise HTTPException(status_code=400, detail=str(user_result.unwrap_err()))
+
+    user = user_result.unwrap()
+    token = auth_service.generate_jwt_token(user)
+
+    return {
+        "data": {
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+            "token": token,
+        }
+    }
+
+
+@http_router.post("/auth/login")
+@inject("auth_service")
+async def login_email_user(
+    request: dict,
+    auth_service: AuthService,
+):
+    email = request.get("email")
+    password = request.get("password")
+
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+
+    auth_result = await auth_service.authenticate_email(email, password)
+    if auth_result.is_err():
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user = auth_result.unwrap()
+    token = auth_service.generate_jwt_token(user)
+
+    return {
+        "data": {
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+            "token": token,
+        }
+    }
+
+
+@http_router.post("/auth/telegram-token")
+@inject("auth_service")
+async def get_telegram_token(
+    request: Request,
+    auth_service: AuthService,
+    current_user: User,
+):
+    if not current_user.tg_id:
+        raise HTTPException(status_code=400, detail="Not a Telegram user")
+
+    token = auth_service.generate_jwt_token(current_user)
+
+    return {
+        "data": {
+            "token": token,
+            "user": {
+                "id": current_user.id,
+                "tg_id": current_user.tg_id,
+                "username": current_user.username,
+                "first_name": current_user.first_name,
+            },
+        }
+    }
+
+
 @http_router.get("/containers")
 @inject("container_service")
 @inject("user_resolver")

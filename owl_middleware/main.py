@@ -59,9 +59,11 @@ async def main() -> None:
         ws_handler=websocket_handler,
     )
 
+    jwt_secret = getenv("JWT_SECRET", "fallback-secret-change-in-production")
+
     database_service = services.DBService(getenv("MONGO_URI"), getenv("DATABASE_NAME"))
     api_service = services.ApiService(getenv("VFS_HTTP_PATH"))
-    auth_service = services.AuthService(database_service)
+    auth_service = services.AuthService(database_service, jwt_secret)
     file_service = services.FileService(database_service, api_service)
     container_service = services.ContainerService(database_service, api_service)
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))

@@ -1,4 +1,4 @@
-from .user import resolve_user, resolve_user_http
+from .user import resolve_user
 from .file import resolve_file
 from .context import (
     start_context,
@@ -50,5 +50,4 @@ __all__ = [
     "download_file_context",
     "download_selection_context",
     "file_preview_context",
-    "resolve_user_http",
 ]
