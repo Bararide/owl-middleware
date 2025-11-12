@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+from fastbot.logger import Logger
 from models import User, Tariff, Label, Container
 from fastbot.core import Result, result_try, Err, Ok
 from .db import DBService
@@ -25,7 +26,9 @@ class ContainerService:
     async def get_containers_by_user_id(
         self, user_id: str
     ) -> Result[List[Container], Exception]:
+        Logger.debug("ITS WORK TOO")
         containers = await self.containers.find({"user_id": user_id}).to_list(None)
+        Logger.debug([Container(**container) for container in containers])
         return Ok([Container(**container) for container in containers])
 
     @result_try
