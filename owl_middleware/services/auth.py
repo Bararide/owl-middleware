@@ -104,23 +104,28 @@ class AuthService:
 
         return Result.Ok(User(**user_data))
 
-    def generate_jwt_token(self, user: User, expires_hours: int = 24) -> str:
+    def generate_jwt_token(self, user, expires_hours: int = 24) -> str:
         payload = {
             "user_id": user.id,
-            "exp": datetime.now() + timedelta(hours=expires_hours),
-            "iat": datetime.now(),
-            "auth_method": user.auth_method,
+            "exp": datetime.utcnow() + timedelta(hours=expires_hours),
+            "iat": datetime.utcnow(),
+            "auth_method": getattr(user, "auth_method", "telegram"),
         }
         return jwt.encode(payload, self.jwt_secret, algorithm=self.algorithm)
 
-    def verify_jwt_token(self, token: str) -> Result[dict, Exception]:
+    def verify_jwt_token(self, token: str):
         try:
             payload = jwt.decode(token, self.jwt_secret, algorithms=[self.algorithm])
-            return Result.Ok(payload)
+            return payload
         except jwt.ExpiredSignatureError:
-            return Result.Err(Exception("Token expired"))
+            raise Exception("Token expired")
         except jwt.InvalidTokenError:
-            return Result.Err(Exception("Invalid token"))
+            raise Exception("Invalid token")
+
+    @result_try
+    async def get_user_by_token(self, token: str) -> Result[User, Exception]:
+        payload = self.verify_jwt_token(token)
+        return await self.get_user(payload["user_id"])
 
     @result_try
     async def get_user_by_token(self, token: str) -> Result[User, Exception]:
