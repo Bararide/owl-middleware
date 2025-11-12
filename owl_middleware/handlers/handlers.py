@@ -33,7 +33,7 @@ async def handle_get_token(
     try:
         token = auth_service.generate_jwt_token(user)
 
-        web_url = f"https://your-app.com?token={token}"
+        web_url = f"http://localhost:8080?token={token}"
 
         Logger.info(f"Generated JWT token for user {user.id}")
 
