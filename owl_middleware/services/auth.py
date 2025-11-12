@@ -3,6 +3,7 @@ import hashlib
 
 from datetime import datetime, timedelta
 from fastbot.core import Result, result_try
+from fastbot.logger import Logger
 from models import User, UserCreate
 
 
@@ -32,6 +33,7 @@ class AuthService:
     @result_try
     async def get_user_by_tg_id(self, tg_id: int) -> Result[User, Exception]:
         user = await self.users.find_one({"tg_id": tg_id})
+        Logger.debug(User(**user) if user else None)
         return User(**user) if user else None
 
     @result_try

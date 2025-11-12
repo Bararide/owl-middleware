@@ -1,6 +1,7 @@
 from typing import Union
 from aiogram.types import Message, CallbackQuery
 from fastapi import Request
+from fastbot.logger import Logger
 from models import User
 from services import AuthService
 from fastbot.core import Result
@@ -11,6 +12,7 @@ async def resolve_user(
 ) -> Result[User, Exception]:
     if hasattr(source, "from_user"):
         tg_id = source.from_user.id
+        Logger.debug("ITS WORK")
         return await auth_service.get_user_by_tg_id(tg_id)
 
     elif isinstance(source, Request):

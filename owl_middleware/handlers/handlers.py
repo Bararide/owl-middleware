@@ -537,6 +537,8 @@ async def handle_search(
 
     containers_result = await container_service.get_containers_by_user_id(str(user.id))
 
+    Logger.info(user.id)
+
     Logger.info(containers_result.unwrap())
 
     search_result = await api_service.semantic_search(

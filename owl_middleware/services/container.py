@@ -33,7 +33,7 @@ class ContainerService:
         self, container_data: dict
     ) -> Result[Container, Exception]:
         existing_container = await self.containers.find_one(
-            {"id": container_data["container_id"]}
+            {"tg_id": container_data["container_id"]}
         )
         if existing_container:
             return Err(ValueError("Container with this ID already exists"))
