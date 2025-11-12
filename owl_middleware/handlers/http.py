@@ -116,8 +116,28 @@ async def get_telegram_token(
 
 @http_router.get("/containers")
 @inject("container_service")
-@inject("user_resolver")
-async def list_containers(container_service: ContainerService, current_user: User):
+@inject("auth_service")
+async def list_containers(
+    container_service: ContainerService,
+    auth_service: AuthService,
+    request: Request,
+):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
     containers_result = await container_service.get_containers_by_user_id(
         str(current_user.id)
     )
