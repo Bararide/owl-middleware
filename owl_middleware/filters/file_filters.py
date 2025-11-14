@@ -23,7 +23,7 @@ async def handle_create_container_callback(
 ):
     await callback.answer()
 
-    return {"context": await cen.get("create_container_help", user_id=user.id)}
+    return {"context": await cen.get("create_container_help", user_id=user.tg_id)}
 
 
 @with_template_engine
@@ -38,7 +38,9 @@ async def callback_file_list(
     container_service: ContainerService,
     cen: ContextEngine,
 ):
-    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+    containers_result = await container_service.get_containers_by_user_id(
+        str(user.tg_id)
+    )
 
     if containers_result.is_err():
         return {

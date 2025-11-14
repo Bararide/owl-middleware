@@ -35,7 +35,7 @@ async def handle_get_token(
 
         web_url = f"http://localhost:8080?token={token}"
 
-        Logger.info(f"Generated JWT token for user {user.id}")
+        Logger.info(f"Generated JWT token for user {user.tg_id}")
 
         return {
             "context": await context_engine.get(
@@ -43,7 +43,7 @@ async def handle_get_token(
                 success=True,
                 token=token,
                 web_url=web_url,
-                user_id=user.id,
+                user_id=user.tg_id,
                 expires_hours=24,
             )
         }
@@ -73,7 +73,7 @@ async def handle_download_file(
 
     if not args:
         containers_result = await container_service.get_containers_by_user_id(
-            str(user.id)
+            str(user.tg_id)
         )
 
         if containers_result.is_err():
@@ -165,7 +165,7 @@ async def handle_download_file(
             )
 
             Logger.info(
-                f"File downloaded successfully: {file_id} from container {container_id} by user {user.id}"
+                f"File downloaded successfully: {file_id} from container {container_id} by user {user.tg_id}"
             )
 
             return {
@@ -246,7 +246,7 @@ async def handle_create_container(
         }
 
     container_data = {
-        "user_id": str(user.id),
+        "user_id": str(user.tg_id),
         "container_id": container_id,
         "memory_limit": memory_limit,
         "storage_quota": storage_quota,
@@ -272,7 +272,7 @@ async def handle_create_container(
         container = db_result.unwrap()
 
         api_result = await api_service.create_container(
-            user_id=str(user.id),
+            user_id=str(user.tg_id),
             container_id=container_id,
             tariff=container.tariff,
             env_label=container.env_label,
@@ -295,7 +295,7 @@ async def handle_create_container(
         limits = limits_result.unwrap() if limits_result.is_ok() else {}
 
         Logger.info(
-            f"Container created successfully: {container_id} for user {user.id}"
+            f"Container created successfully: {container_id} for user {user.tg_id}"
         )
 
         return {
@@ -303,7 +303,7 @@ async def handle_create_container(
                 "create_container",
                 success=True,
                 container_id=container_id,
-                user_id=str(user.id),
+                user_id=str(user.tg_id),
                 container=container,
                 limits=limits,
             )
@@ -328,7 +328,9 @@ async def handle_select_container(
     container_service: ContainerService,
     cen: ContextEngine,
 ):
-    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+    containers_result = await container_service.get_containers_by_user_id(
+        str(user.tg_id)
+    )
 
     if containers_result.is_err() or not containers_result.unwrap():
         return {
@@ -366,7 +368,9 @@ async def handle_file_upload(
             "context": await cen.get("file_upload", error="Пожалуйста, отправьте файл")
         }
 
-    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+    containers_result = await container_service.get_containers_by_user_id(
+        str(user.tg_id)
+    )
 
     if containers_result.is_err():
         return {
@@ -403,7 +407,7 @@ async def handle_file_upload(
         "container_id": container.id,
         "name": document.file_name or f"file_{document.file_id}",
         "size": document.file_size,
-        "user_id": str(user.id),
+        "user_id": str(user.tg_id),
         "created_at": datetime.now(),
         "mime_type": document.mime_type or "application/octet-stream",
     }
@@ -462,7 +466,7 @@ async def handle_file_upload(
             api_result = await api_service.create_file(
                 path=file.id,
                 content=extracted_text,
-                user_id=str(user.id),
+                user_id=str(user.tg_id),
                 container_id=container.id,
             )
 
@@ -471,7 +475,7 @@ async def handle_file_upload(
             api_result = await api_service.create_file(
                 path=file.id,
                 content=content_text,
-                user_id=str(user.id),
+                user_id=str(user.tg_id),
                 container_id=container.id,
             )
         else:
@@ -479,7 +483,7 @@ async def handle_file_upload(
             api_result = await api_service.create_file(
                 path=file.id,
                 content=content_base64,
-                user_id=str(user.id),
+                user_id=str(user.tg_id),
                 container_id=container.id,
             )
 
@@ -535,7 +539,9 @@ async def handle_search(
             )
         }
 
-    containers_result = await container_service.get_containers_by_user_id(str(user.id))
+    containers_result = await container_service.get_containers_by_user_id(
+        str(user.tg_id)
+    )
 
     search_result = await api_service.semantic_search(
         query,
@@ -812,7 +818,7 @@ async def handle_list_files(
     container_service: ContainerService,
     cen: ContextEngine,
 ):
-    containers = await container_service.get_containers_by_user_id(user.id)
+    containers = await container_service.get_containers_by_user_id(user.tg_id)
     files_result = [
         await file_service.get_files_by_container(container) for container in containers
     ]
@@ -886,7 +892,7 @@ async def handle_delete_file(
 
     file = file_result.unwrap()
 
-    if file.user_id != user.id and not user.is_admin:
+    if file.user_id != user.tg_id and not user.is_admin:
         return {"context": await cen.get("delete_file", error="Access denied")}
 
     delete_result = await file_service.delete_file(file_id)

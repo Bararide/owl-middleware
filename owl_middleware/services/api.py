@@ -202,28 +202,54 @@ class ApiService:
         if connect_result.is_err():
             return connect_result
 
+        Logger.info(container.id)
+
         payload = {
             "query": query,
             "limit": limit,
-            "user_id": str(user.id),
+            "user_id": str(user.tg_id),
             "container_id": str(container.id),
         }
 
         try:
             async with self.session.post(
-                "containers/semantic", json=payload
+                "/containers/semantic",
+                json=payload,
+                headers={"Content-Type": "application/json"},
             ) as response:
+                Logger.info(f"Semantic search response: {response.status}")
+
+                response_text = await response.text()
+                Logger.info(f"Raw response text: {response_text}")
+                Logger.info(f"Response headers: {dict(response.headers)}")
+
                 if response.status == 200:
-                    data = await response.json()
-                    if "data" in data:
-                        return Ok(data["data"])
-                    else:
-                        return Ok(data)
+                    try:
+                        data = json.loads(response_text)
+                        if "data" in data:
+                            return Ok(data["data"])
+                        else:
+                            return Ok(data)
+                    except json.JSONDecodeError as e:
+                        Logger.error(f"JSON decode error: {e}")
+                        return Err(Exception(f"Invalid JSON response: {response_text}"))
                 else:
-                    error_data = await response.json()
-                    error_msg = error_data.get("error", f"HTTP error {response.status}")
+                    try:
+                        error_data = json.loads(response_text)
+                        error_msg = error_data.get(
+                            "error", f"HTTP error {response.status}"
+                        )
+                    except:
+                        error_msg = f"HTTP error {response.status}: {response_text}"
+
+                    Logger.error(f"Semantic search failed: {error_msg}")
                     return Err(Exception(error_msg))
+
         except aiohttp.ClientError as e:
+            Logger.error(f"HTTP client error: {e}")
+            return Err(e)
+        except Exception as e:
+            Logger.error(f"Unexpected error in semantic_search: {e}")
             return Err(e)
 
     @result_try
