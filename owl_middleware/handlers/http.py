@@ -125,15 +125,20 @@ async def list_containers(
     token = None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
+        Logger.error(f"Auth header: {auth_header}")
         token = auth_header[7:]
+        Logger.error(f"Token: {token}")
     else:
         token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
 
     if not token:
+        Logger.error("No token provided")
         raise HTTPException(status_code=401, detail="Token required")
 
     user_result = await auth_service.get_user_by_token(token)
     if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
     current_user = user_result.unwrap()
@@ -143,6 +148,7 @@ async def list_containers(
     )
 
     if containers_result.is_err():
+        Logger.error(f"Error fetching containers: {containers_result.unwrap_err()}")
         raise HTTPException(status_code=500, detail="Error fetching containers")
 
     containers = containers_result.unwrap()

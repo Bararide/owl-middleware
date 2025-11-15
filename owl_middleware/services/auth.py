@@ -14,9 +14,7 @@ class AuthService:
         self.jwt_secret = jwt_secret
         self.algorithm = algorithm
 
-        self._ensure_indexes()
-
-    async def _ensure_indexes(self):
+    async def ensure_indexes(self):
         await self.users.create_index("id", unique=True)
         await self.users.create_index("tg_id", unique=True, sparse=True)
         await self.users.create_index("email", unique=True, sparse=True)
