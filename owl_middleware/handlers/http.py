@@ -160,14 +160,20 @@ async def list_containers(
                 "file_limit": container.tariff.file_limit,
                 "env_label": container.env_label,
                 "type_label": container.type_label,
-                "created_at": (
-                    container.created_at.isoformat() if container.created_at else None
-                ),
-                "cpu_usage": container.cpu_usage,
-                "memory_usage": container.memory_usage,
+                # "created_at": (
+                #     container.created_at.isoformat() if container.created_at else None
+                # ),
+                "created_at": datetime.now().isoformat(),
+                "cpu_usage": "10",
+                "memory_usage": "10",
                 "user_id": container.user_id,
                 "commands": container.commands,
                 "privileged": container.privileged,
+                # "cpu_usage": container.cpu_usage,
+                # "memory_usage": container.memory_usage,
+                # "user_id": container.user_id,
+                # "commands": container.commands,
+                # "privileged": container.privileged,
             }
             for container in containers
         ]
