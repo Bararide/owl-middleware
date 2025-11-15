@@ -125,9 +125,7 @@ async def list_containers(
     token = None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        Logger.error(f"Auth header: {auth_header}")
         token = auth_header[7:]
-        Logger.error(f"Token: {token}")
     else:
         token = request.query_params.get("token")
         Logger.error(f"Query token: {request.query_params.get('token')}")
@@ -144,7 +142,7 @@ async def list_containers(
     current_user = user_result.unwrap()
 
     containers_result = await container_service.get_containers_by_user_id(
-        str(current_user.id)
+        str(current_user.tg_id)
     )
 
     if containers_result.is_err():
@@ -156,10 +154,10 @@ async def list_containers(
         "data": [
             {
                 "id": container.id,
-                "status": container.status,
-                "memory_limit": container.memory_limit,
-                "storage_quota": container.storage_quota,
-                "file_limit": container.file_limit,
+                "status": "running",
+                "memory_limit": container.tariff.memory_limit,
+                "storage_quota": container.tariff.storage_quota,
+                "file_limit": container.tariff.file_limit,
                 "env_label": container.env_label,
                 "type_label": container.type_label,
                 "created_at": (

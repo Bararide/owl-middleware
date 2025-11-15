@@ -25,6 +25,7 @@ class AuthService:
 
     @result_try
     async def get_user(self, user_id: int) -> Result[User, Exception]:
+        Logger.error(f"{user_id}")
         user = await self.users.find_one({"id": user_id})
         return User(**user) if user else None
 
@@ -113,6 +114,7 @@ class AuthService:
         }
         return jwt.encode(payload, self.jwt_secret, algorithm=self.algorithm)
 
+    @result_try
     def verify_jwt_token(self, token: str):
         try:
             payload = jwt.decode(token, self.jwt_secret, algorithms=[self.algorithm])
@@ -121,11 +123,6 @@ class AuthService:
             raise Exception("Token expired")
         except jwt.InvalidTokenError:
             raise Exception("Invalid token")
-
-    @result_try
-    async def get_user_by_token(self, token: str) -> Result[User, Exception]:
-        payload = self.verify_jwt_token(token)
-        return await self.get_user(payload["user_id"])
 
     @result_try
     async def get_user_by_token(self, token: str) -> Result[User, Exception]:
