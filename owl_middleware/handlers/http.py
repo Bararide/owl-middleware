@@ -270,7 +270,7 @@ async def get_file_content(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@http_router.delete("/containers/{container_id}/files/{file_id}")
+@http_router.delete("/containers/{file_id}/files/{container_id}")
 @inject("container_service")
 @inject("api_service")
 @inject("auth_service")

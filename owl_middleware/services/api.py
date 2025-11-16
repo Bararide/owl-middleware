@@ -126,7 +126,7 @@ class ApiService:
             return Err(e)
 
     @result_try
-    async def delete_file_in_container(
+    async def delete_file(
         self, user_id: str, container_id: str, file_id: str
     ) -> Result[bool, Exception]:
         connect_result = await self.connect()
