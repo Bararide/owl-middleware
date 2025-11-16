@@ -266,7 +266,7 @@ async def list_files(
     }
 
 
-def _detect_mime_type(self, filename: str) -> str:
+def _detect_mime_type(filename: str) -> str:
     extension = filename.lower().split(".")[-1] if "." in filename else ""
     mime_map = {
         "txt": "text/plain",
