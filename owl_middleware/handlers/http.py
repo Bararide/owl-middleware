@@ -270,6 +270,53 @@ async def get_file_content(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@http_router.delete("/containers/{container_id}/files/{file_id}")
+@inject("container_service")
+@inject("api_service")
+@inject("auth_service")
+async def delete_file_in_container(
+    container_id: str,
+    file_id: str,
+    container_service: ContainerService,
+    api_service: ApiService,
+    auth_service: AuthService,
+    request: Request,
+):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    api_result = await api_service.delete_file(
+        user_id=str(str(current_user.id)), container_id=container_id, file_id=file_id
+    )
+
+    if api_result.is_err():
+        raise HTTPException(
+            status_code=500, detail="Error deleting files from container"
+        )
+
+    return {"data": {"success": True}}
+
+
 @http_router.get("/containers/{container_id}/files")
 @inject("file_service")
 @inject("container_service")
