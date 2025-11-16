@@ -66,7 +66,9 @@ async def main() -> None:
     auth_service = services.AuthService(database_service, jwt_secret)
     await auth_service.ensure_indexes()
     file_service = services.FileService(database_service, api_service)
-    container_service = services.ContainerService(database_service, api_service)
+    container_service = services.ContainerService(
+        database_service, api_service, file_service
+    )
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
 

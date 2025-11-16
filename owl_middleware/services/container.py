@@ -8,10 +8,13 @@ from .file import FileService
 
 
 class ContainerService:
-    def __init__(self, db_service: DBService, api_service: ApiService):
+    def __init__(
+        self, db_service: DBService, api_service: ApiService, file_service: FileService
+    ):
         self.db_service = db_service
         self.api_service = api_service
         self.containers = self.db_service.db["containers"]
+        self.file_service = file_service
 
     @result_try
     async def get_container(self, container_id: str) -> Result[Container, Exception]:
@@ -146,12 +149,13 @@ class ContainerService:
 
     @result_try
     async def delete_container(self, container_id: str) -> Result[bool, Exception]:
-        file_service = FileService(self.db_service, self.api_service)
         container_result = await self.get_container(container_id)
         if container_result.is_err():
             return container_result
 
-        files = await file_service.get_files_by_container(container_result.unwrap())
+        files = await self.file_service.get_files_by_container(
+            container_result.unwrap()
+        )
         if files:
             return Err(ValueError("Cannot delete container with existing files"))
 
@@ -166,9 +170,8 @@ class ContainerService:
         if container_result.is_err():
             return container_result
 
-        file_service = FileService(self.db_service, self.api_service)
         container = container_result.unwrap()
-        files = await file_service.get_files_by_container(container)
+        files = await self.file_service.get_files_by_container(container)
 
         total_size = sum(file.size or 0 for file in files)
         storage_usage_percent = (
