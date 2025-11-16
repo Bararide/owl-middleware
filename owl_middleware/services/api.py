@@ -84,8 +84,8 @@ class ApiService:
             return connect_result
 
         payload = {
-            "user_id": user_id,
-            "container_id": container_id,
+            "user_id": str(user_id),
+            "container_id": str(container_id),
         }
 
         try:

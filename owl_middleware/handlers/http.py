@@ -390,7 +390,7 @@ async def delete_container(
         raise HTTPException(status_code=404, detail="Container not found")
 
     delete_result = await container_service.delete_container(
-        (user_result.unwrap().tg_id), container_id
+        (user_result.unwrap().id), container_id
     )
 
     if delete_result.is_err():
