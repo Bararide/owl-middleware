@@ -368,9 +368,7 @@ async def handle_file_upload(
             "context": await cen.get("file_upload", error="Пожалуйста, отправьте файл")
         }
 
-    containers_result = await container_service.get_containers_by_user_id(
-        str(user.tg_id)
-    )
+    containers_result = await container_service.get_containers_by_user_id(str(user.id))
 
     if containers_result.is_err():
         return {
