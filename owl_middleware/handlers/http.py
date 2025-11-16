@@ -306,7 +306,7 @@ async def delete_file_in_container(
         raise HTTPException(status_code=404, detail="Container not found")
 
     api_result = await api_service.delete_file(
-        user_id=str(str(current_user.id)), container_id=container_id, file_id=file_id
+        user_id=str(current_user.id), container_id=container_id, file_id=file_id
     )
 
     if api_result.is_err():

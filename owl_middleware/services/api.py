@@ -126,6 +126,58 @@ class ApiService:
             return Err(e)
 
     @result_try
+    async def delete_file_in_container(
+        self, user_id: str, container_id: str, file_id: str
+    ) -> Result[bool, Exception]:
+        connect_result = await self.connect()
+        if connect_result.is_err():
+            return connect_result
+
+        payload = {"user_id": user_id, "container_id": container_id, "file_id": file_id}
+
+        try:
+            async with self.session.delete(
+                f"/files/delete",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+
+                response_text = await response.text()
+                Logger.info(f"Raw response text: {response_text}")
+
+                try:
+                    data = json.loads(response_text)
+                    Logger.info(f"Parsed JSON data: {data}")
+
+                    if response.status == 200:
+                        if "data" in data:
+                            container_data = data["data"]
+                            if container_data.get("status") in [
+                                "deleted",
+                                "deletion_pending",
+                            ]:
+                                return Ok(True)
+                            else:
+                                return Ok(False)
+                        else:
+                            return Ok(True)
+                    else:
+                        error_msg = data.get("error", f"HTTP error {response.status}")
+                        return Err(Exception(error_msg))
+
+                except json.JSONDecodeError as e:
+                    Logger.error(f"JSON decode error: {e}")
+                    Logger.error(f"Response text that failed to parse: {response_text}")
+                    return Err(Exception(f"Invalid JSON response: {response_text}"))
+
+        except aiohttp.ClientError as e:
+            Logger.error(f"HTTP client error: {e}")
+            return Err(e)
+        except Exception as e:
+            Logger.error(f"Unexpected error in delete_container: {e}")
+            return Err(e)
+
+    @result_try
     async def delete_container(
         self, user_id: str, container_id: str
     ) -> Result[bool, Exception]:
