@@ -358,7 +358,6 @@ async def create_container(
 
 @http_router.delete("/containers/{container_id}")
 @inject("container_service")
-@inject("user_resolver")
 @inject("auth_service")
 async def delete_container(
     container_id: str,
