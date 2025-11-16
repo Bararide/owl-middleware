@@ -148,7 +148,9 @@ class ContainerService:
         return Ok(result.modified_count > 0)
 
     @result_try
-    async def delete_container(self, container_id: str) -> Result[bool, Exception]:
+    async def delete_container(
+        self, user_id: str, container_id: str
+    ) -> Result[bool, Exception]:
         container_result = await self.get_container(container_id)
         if container_result.is_err():
             return container_result
@@ -158,6 +160,8 @@ class ContainerService:
         )
 
         [await self.file_service.delete_file(file.id) for file in files]
+
+        self.api_service.delete_container(user_id, container_id)
 
         result = await self.containers.delete_one({"id": container_id})
         return Ok(result.deleted_count > 0)

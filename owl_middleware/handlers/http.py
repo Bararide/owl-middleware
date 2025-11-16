@@ -322,7 +322,9 @@ async def create_container(
     )
 
     if api_result.is_err():
-        await container_service.delete_container(request["container_id"])
+        await container_service.delete_container(
+            current_user.tg_id, request["container_id"]
+        )
         raise HTTPException(
             status_code=500, detail=f"Service error: {api_result.unwrap_err()}"
         )
