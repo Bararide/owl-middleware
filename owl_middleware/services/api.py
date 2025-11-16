@@ -79,22 +79,20 @@ class ApiService:
     async def get_files_by_container_id(
         self,
         user_id: str,
-        file_id: str,
         container_id: str,
-    ) -> Result[List[File], Exception]:
+    ) -> Result[List[Dict[str, Any]], Exception]:
         connect_result = await self.connect()
         if connect_result.is_err():
             return connect_result
 
         payload = {
             "user_id": str(user_id),
-            "file_id": str(file_id),
             "container_id": str(container_id),
         }
 
         try:
             async with self.session.get(
-                f"/container/files",
+                "/container/files",
                 json=payload,
                 headers={"Content-Type": "application/json"},
             ) as response:
@@ -108,9 +106,12 @@ class ApiService:
                     if response.status == 200:
                         if "data" in data:
                             files_data = data["data"]
-                            return Ok(files_data)
+                            if "files" in files_data:
+                                return Ok(files_data["files"])
+                            else:
+                                return Ok([])
                         else:
-                            return Ok({})
+                            return Ok([])
                     else:
                         error_msg = data.get("error", f"HTTP error {response.status}")
                         return Err(Exception(error_msg))

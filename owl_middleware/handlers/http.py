@@ -216,51 +216,73 @@ async def list_files(
     if container_result.is_err() or not container_result.unwrap():
         raise HTTPException(status_code=404, detail="Container not found")
 
-    files_result = await file_service.get_files_by_container(container_id)
-
-    if files_result.is_err():
-        raise HTTPException(status_code=500, detail="Error fetching files")
-
-    files = files_result.unwrap()
-
-    files_api_result = [
-        await api_service.get_files_by_container_id(
-            current_user.id, file.id, container_id
-        )
-        for file in files
-    ]
+    files_api_result = await api_service.get_files_by_container_id(
+        current_user.id, container_id
+    )
 
     if files_api_result.is_err():
-        raise HTTPException(status_code=500, detail="Error fetching files")
+        raise HTTPException(
+            status_code=500, detail="Error fetching files from container"
+        )
+
+    container_files = files_api_result.unwrap()
+
+    files_db_result = await file_service.get_files_by_container(container_id)
+    db_files = files_db_result.unwrap() if files_db_result.is_ok() else []
+
+    db_files_map = {file.name: file for file in db_files}
+
+    enriched_files = []
+    for container_file in container_files:
+        file_name = container_file.get("name", "")
+        db_file = db_files_map.get(file_name)
+
+        enriched_file = {
+            "id": db_file.id if db_file else None,
+            "name": file_name,
+            "path": container_file.get("path", ""),
+            "content": container_file.get("content", ""),
+            "size": container_file.get("size", 0),
+            "category": container_file.get("category", "unknown"),
+            "is_directory": container_file.get("is_directory", False),
+            "exists": container_file.get("exists", True),
+            "container_id": container_id,
+            "user_id": current_user.id,
+            "created_at": (
+                db_file.created_at.isoformat()
+                if db_file and db_file.created_at
+                else None
+            ),
+            "mime_type": (
+                db_file.mime_type if db_file else _detect_mime_type(file_name)
+            ),
+        }
+        enriched_files.append(enriched_file)
 
     return {
-        "data": [
-            {
-                "id": file.id,
-                "path": "file.path",
-                "name": file.name,
-                "size": file.size,
-                "container_id": file.container_id,
-                "user_id": file.user_id,
-                "created_at": "file.created_at.isoformat() if file.created_at else None",
-                "mime_type": file.mime_type,
-            }
-            for file in files
-        ]
-        # "data": [
-        #     {
-        #         "id": file.id,
-        #         "path": file.path,
-        #         "name": file.name,
-        #         "size": file.size,
-        #         "container_id": file.container_id,
-        #         "user_id": file.user_id,
-        #         "created_at": file.created_at.isoformat() if file.created_at else None,
-        #         "mime_type": file.mime_type,
-        #     }
-        #     for file in files
-        # ]
+        "data": enriched_files,
+        "count": len(enriched_files),
+        "container_id": container_id,
     }
+
+
+def _detect_mime_type(self, filename: str) -> str:
+    extension = filename.lower().split(".")[-1] if "." in filename else ""
+    mime_map = {
+        "txt": "text/plain",
+        "py": "text/x-python",
+        "cpp": "text/x-c++",
+        "c": "text/x-c",
+        "h": "text/x-c",
+        "json": "application/json",
+        "yaml": "application/x-yaml",
+        "yml": "application/x-yaml",
+        "md": "text/markdown",
+        "html": "text/html",
+        "css": "text/css",
+        "js": "application/javascript",
+    }
+    return mime_map.get(extension, "application/octet-stream")
 
 
 @http_router.get("/containers/{container_id}")
