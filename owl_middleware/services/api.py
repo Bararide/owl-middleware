@@ -397,7 +397,7 @@ class ApiService:
         if connect_result.is_err():
             return connect_result
 
-        payload = {"file_id": file_id, "container_id": container_id}
+        payload = {"file_id": str(file_id), "container_id": str(container_id)}
 
         try:
             async with self.session.get(
