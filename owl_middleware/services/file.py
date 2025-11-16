@@ -82,6 +82,6 @@ class FileService:
         return result.deleted_count > 0
 
     @result_try
-    async def get_files_by_container(self, container: Container) -> list[File]:
-        files = await self.files.find({"container_id": container.id}).to_list(None)
+    async def get_files_by_container(self, container_id: str) -> list[File]:
+        files = await self.files.find({"container_id": container_id}).to_list(None)
         return [File(**file) for file in files]

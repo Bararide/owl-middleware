@@ -205,16 +205,29 @@ async def list_files(
         "data": [
             {
                 "id": file.id,
-                "path": file.path,
+                "path": "file.path",
                 "name": file.name,
                 "size": file.size,
                 "container_id": file.container_id,
                 "user_id": file.user_id,
-                "created_at": file.created_at.isoformat() if file.created_at else None,
+                "created_at": "file.created_at.isoformat() if file.created_at else None",
                 "mime_type": file.mime_type,
             }
             for file in files
         ]
+        # "data": [
+        #     {
+        #         "id": file.id,
+        #         "path": file.path,
+        #         "name": file.name,
+        #         "size": file.size,
+        #         "container_id": file.container_id,
+        #         "user_id": file.user_id,
+        #         "created_at": file.created_at.isoformat() if file.created_at else None,
+        #         "mime_type": file.mime_type,
+        #     }
+        #     for file in files
+        # ]
     }
 
 
