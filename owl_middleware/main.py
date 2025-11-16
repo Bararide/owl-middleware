@@ -17,8 +17,6 @@ from fastbot.engine import TemplateEngine
 from fastbot import FastBotBuilder, MiniAppConfig
 from fastbot.logger import Logger
 
-from fastapi import APIRouter
-
 import services
 import models
 import resolvers
