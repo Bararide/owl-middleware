@@ -184,13 +184,34 @@ async def list_containers(
 @inject("file_service")
 @inject("container_service")
 @inject("api_service")
+@inject("auth_service")
 async def list_files(
     container_id: str,
     file_service: FileService,
     container_service: ContainerService,
     api_service: ApiService,
+    auth_service: AuthService,
     request: Request,
 ):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
     container_result = await container_service.get_container(container_id)
     if container_result.is_err() or not container_result.unwrap():
         raise HTTPException(status_code=404, detail="Container not found")
@@ -201,6 +222,17 @@ async def list_files(
         raise HTTPException(status_code=500, detail="Error fetching files")
 
     files = files_result.unwrap()
+
+    files_api_result = [
+        await api_service.get_files_by_container_id(
+            current_user.id, file.id, container_id
+        )
+        for file in files
+    ]
+
+    if files_api_result.is_err():
+        raise HTTPException(status_code=500, detail="Error fetching files")
+
     return {
         "data": [
             {
