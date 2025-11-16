@@ -180,6 +180,90 @@ async def list_containers(
     }
 
 
+@http_router.get("/containers/{container_id}/files/{file_id}/content")
+@inject("auth_service")
+@inject("container_service")
+@inject("api_service")
+@inject("file_service")
+async def get_file_content(
+    container_id: str,
+    file_id: str,
+    auth_service: AuthService,
+    container_service: ContainerService,
+    api_service: ApiService,
+    file_service: FileService,
+    request: Request,
+):
+    try:
+        token = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = request.query_params.get("token")
+
+        if not token:
+            Logger.error("No token provided for file content")
+            raise HTTPException(status_code=401, detail="Token required")
+
+        user_result = await auth_service.get_user_by_token(token)
+        if user_result.is_err():
+            Logger.error(f"Invalid token for file content: {user_result.unwrap_err()}")
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        current_user = user_result.unwrap()
+        Logger.info(
+            f"User {current_user.tg_id} requesting file content: {file_id} from container: {container_id}"
+        )
+
+        container_result = await container_service.get_container(container_id)
+        if container_result.is_err() or not container_result.unwrap():
+            Logger.error(f"Container not found: {container_id}")
+            raise HTTPException(status_code=404, detail="Container not found")
+
+        container = container_result.unwrap()
+        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+            Logger.error(
+                f"Access denied for user {current_user.tg_id} to container {container_id}"
+            )
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        content_result = await api_service.get_file_content(file_id, container_id)
+
+        if content_result.is_err():
+            error = content_result.unwrap_err()
+            Logger.error(f"Error getting file content: {error}")
+            raise HTTPException(
+                status_code=500, detail=f"Error reading file content: {error}"
+            )
+
+        content = content_result.unwrap()
+
+        file_service_result = await file_service.get_file(file_id)
+        file_metadata = (
+            file_service_result.unwrap() if file_service_result.is_ok() else None
+        )
+
+        response_data = {
+            "content": content,
+            "encoding": "utf-8",
+            "size": len(content),
+            "mime_type": file_metadata.mime_type if file_metadata else "text/plain",
+        }
+
+        Logger.info(
+            f"File content retrieved successfully: {file_id} from container {container_id}"
+        )
+
+        return {"data": response_data}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        Logger.error(f"Unexpected error in get_file_content: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @http_router.get("/containers/{container_id}/files")
 @inject("file_service")
 @inject("container_service")
@@ -282,7 +366,7 @@ def _detect_mime_type(filename: str) -> str:
         "css": "text/css",
         "js": "application/javascript",
     }
-    return mime_map.get(extension, "application/octet-stream")
+    return mime_map.get(extension, "text/plain")
 
 
 @http_router.get("/containers/{container_id}")

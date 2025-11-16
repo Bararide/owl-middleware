@@ -97,11 +97,9 @@ class ApiService:
                 headers={"Content-Type": "application/json"},
             ) as response:
                 response_text = await response.text()
-                Logger.info(f"Raw response text: {response_text}")
 
                 try:
                     data = json.loads(response_text)
-                    Logger.info(f"Parsed JSON data: {data}")
 
                     if response.status == 200:
                         if "data" in data:
