@@ -359,12 +359,32 @@ async def create_container(
 @http_router.delete("/containers/{container_id}")
 @inject("container_service")
 @inject("user_resolver")
+@inject("auth_service")
 async def delete_container(
     container_id: str,
     container_service: ContainerService,
-    current_user: User,
+    auth_service: AuthService,
+    request: Request,
 ):
-    """Delete container"""
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
     container_result = await container_service.get_container(container_id)
 
     if container_result.is_err() or not container_result.unwrap():
