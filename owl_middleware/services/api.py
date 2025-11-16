@@ -76,6 +76,57 @@ class ApiService:
             return Err(e)
 
     @result_try
+    async def get_files_by_container_id(
+        self,
+        user_id: str,
+        file_id: str,
+        container_id: str,
+    ) -> Result[List[File], Exception]:
+        connect_result = await self.connect()
+        if connect_result.is_err():
+            return connect_result
+
+        payload = {
+            "user_id": str(user_id),
+            "file_id": str(file_id),
+            "container_id": str(container_id),
+        }
+
+        try:
+            async with self.session.get(
+                f"/container/files",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                response_text = await response.text()
+                Logger.info(f"Raw response text: {response_text}")
+
+                try:
+                    data = json.loads(response_text)
+                    Logger.info(f"Parsed JSON data: {data}")
+
+                    if response.status == 200:
+                        if "data" in data:
+                            files_data = data["data"]
+                            return Ok(files_data)
+                        else:
+                            return Ok({})
+                    else:
+                        error_msg = data.get("error", f"HTTP error {response.status}")
+                        return Err(Exception(error_msg))
+
+                except json.JSONDecodeError as e:
+                    Logger.error(f"JSON decode error: {e}")
+                    Logger.error(f"Response text that failed to parse: {response_text}")
+                    return Err(Exception(f"Invalid JSON response: {response_text}"))
+        except aiohttp.ClientError as e:
+            Logger.error(f"HTTP client error: {e}")
+            return Err(e)
+        except Exception as e:
+            Logger.error(f"Unexpected error in get_files_by_container_id: {e}")
+            return Err(e)
+
+    @result_try
     async def delete_container(
         self, user_id: str, container_id: str
     ) -> Result[bool, Exception]:
