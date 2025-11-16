@@ -156,8 +156,8 @@ class ContainerService:
         files = await self.file_service.get_files_by_container(
             container_result.unwrap()
         )
-        if files:
-            return Err(ValueError("Cannot delete container with existing files"))
+
+        [await self.file_service.delete_file(file.id) for file in files]
 
         result = await self.containers.delete_one({"id": container_id})
         return Ok(result.deleted_count > 0)
