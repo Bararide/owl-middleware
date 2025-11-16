@@ -405,13 +405,19 @@ class ApiService:
                 json=payload,
                 headers={"Content-Type": "application/json"},
             ) as response:
+                Logger.error("1.1")
                 if response.status == 200:
+                    Logger.error("1.2")
                     data = await response.json()
+                    Logger.error(f"{await response.json()}")
                     if "data" in data:
-                        return Ok(data["data"])
+                        Logger.error(f"{data["data"]}")
+                        return Ok(str(data["data"]))
                     else:
-                        return Ok(data)
+                        Logger.error(f"{data}")
+                        return Ok(str(data))
                 else:
+                    Logger.error("1.3")
                     error_data = await response.json()
                     error_msg = error_data.get("error", f"HTTP error {response.status}")
                     return Err(Exception(error_msg))

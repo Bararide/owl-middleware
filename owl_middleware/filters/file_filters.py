@@ -53,7 +53,7 @@ async def callback_file_list(
 
     all_files = []
     for container in containers:
-        files_result = await file_service.get_files_by_container(container)
+        files_result = await file_service.get_files_by_container(container.id)
         if files_result.is_ok():
             all_files.extend(files_result.unwrap())
 

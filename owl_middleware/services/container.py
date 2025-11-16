@@ -87,7 +87,7 @@ class ContainerService:
 
         file_service = FileService(self.db_service, self.api_service)
         container = container_result.unwrap()
-        files = await file_service.get_files_by_container(container)
+        files = await file_service.get_files_by_container(container.id)
 
         total_size = sum(file.size or 0 for file in files)
 
@@ -155,7 +155,7 @@ class ContainerService:
             return container_result
 
         files = await self.file_service.get_files_by_container(
-            container_result.unwrap()
+            container_result.unwrap().id
         )
 
         [await self.file_service.delete_file(file.id) for file in files]
@@ -176,7 +176,7 @@ class ContainerService:
             return container_result
 
         container = container_result.unwrap()
-        files = await self.file_service.get_files_by_container(container)
+        files = await self.file_service.get_files_by_container(container.id)
 
         total_size = sum(file.size or 0 for file in files)
         storage_usage_percent = (
@@ -218,7 +218,7 @@ class ContainerService:
 
         file_service = FileService(self.db_service, self.api_service)
         container = container_result.unwrap()
-        files = await file_service.get_files_by_container(container)
+        files = await file_service.get_files_by_container(container.id)
 
         total_size = sum(file.size or 0 for file in files)
 

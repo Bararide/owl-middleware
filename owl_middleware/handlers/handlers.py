@@ -820,7 +820,8 @@ async def handle_list_files(
 ):
     containers = await container_service.get_containers_by_user_id(user.tg_id)
     files_result = [
-        await file_service.get_files_by_container(container) for container in containers
+        await file_service.get_files_by_container(container.id)
+        for container in containers
     ]
 
     if files_result.is_err():

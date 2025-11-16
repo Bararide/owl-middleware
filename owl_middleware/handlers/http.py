@@ -228,9 +228,13 @@ async def get_file_content(
             )
             raise HTTPException(status_code=403, detail="Access denied")
 
+        Logger.error("1")
+
         content_result = await api_service.get_file_content(
             str(file_id), str(container_id)
         )
+
+        Logger.error("2")
 
         if content_result.is_err():
             error = content_result.unwrap_err()
