@@ -282,7 +282,7 @@ async def handle_create_container(
         )
 
         if api_result.is_err():
-            await container_service.delete_container(container_id)
+            await container_service.delete_container(str(user.tg_id), container_id)
             error = api_result.unwrap_err()
             Logger.error(f"Error creating container in C++ service: {error}")
             return {
