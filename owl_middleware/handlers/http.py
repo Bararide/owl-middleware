@@ -180,9 +180,48 @@ async def list_containers(
     }
 
 
+@http_router.get("/containers/{container_id}/files")
+@inject("file_service")
+@inject("container_service")
+@inject("api_service")
+async def list_files(
+    container_id: str,
+    file_service: FileService,
+    container_service: ContainerService,
+    api_service: ApiService,
+    request: Request,
+):
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    files_result = await file_service.get_files_by_container(container_id)
+
+    if files_result.is_err():
+        raise HTTPException(status_code=500, detail="Error fetching files")
+
+    files = files_result.unwrap()
+    return {
+        "data": [
+            {
+                "id": file.id,
+                "path": file.path,
+                "name": file.name,
+                "size": file.size,
+                "container_id": file.container_id,
+                "user_id": file.user_id,
+                "created_at": file.created_at.isoformat() if file.created_at else None,
+                "mime_type": file.mime_type,
+            }
+            for file in files
+        ]
+    }
+
+
 @http_router.get("/containers/{container_id}")
 @inject("container_service")
 @inject("user_resolver")
+@inject("api_service")
 async def get_container(
     container_id: str,
     container_service: ContainerService,
@@ -222,15 +261,35 @@ async def get_container(
 @http_router.post("/containers")
 @inject("container_service")
 @inject("api_service")
-@inject("user_resolver")
+@inject("auth_service")
 async def create_container(
     request: dict,
+    req: Request,
     container_service: ContainerService,
     api_service: ApiService,
-    current_user: User,
+    auth_service: AuthService,
 ):
+    token = None
+    auth_header = req.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = req.query_params.get("token")
+        Logger.error(f"Query token: {req.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
     container_data = {
-        "user_id": str(current_user.id),
+        "user_id": str(current_user.tg_id),
         "container_id": request["container_id"],
         "memory_limit": request["memory_limit"],
         "storage_quota": request["storage_quota"],
@@ -269,21 +328,31 @@ async def create_container(
         )
 
     return {
-        "data": {
-            "id": container.id,
-            "status": container.status,
-            "memory_limit": container.memory_limit,
-            "storage_quota": container.storage_quota,
-            "file_limit": container.file_limit,
-            "env_label": container.env_label,
-            "type_label": container.type_label,
-            "created_at": (
-                container.created_at.isoformat() if container.created_at else None
-            ),
-            "user_id": container.user_id,
-            "commands": container.commands,
-            "privileged": container.privileged,
-        }
+        "data": [
+            {
+                "id": container.id,
+                "status": "running",
+                "memory_limit": container.tariff.memory_limit,
+                "storage_quota": container.tariff.storage_quota,
+                "file_limit": container.tariff.file_limit,
+                "env_label": container.env_label,
+                "type_label": container.type_label,
+                # "created_at": (
+                #     container.created_at.isoformat() if container.created_at else None
+                # ),
+                "created_at": datetime.now().isoformat(),
+                "cpu_usage": "10",
+                "memory_usage": "10",
+                "user_id": container.user_id,
+                "commands": container.commands,
+                "privileged": container.privileged,
+                # "cpu_usage": container.cpu_usage,
+                # "memory_usage": container.memory_usage,
+                # "user_id": container.user_id,
+                # "commands": container.commands,
+                # "privileged": container.privileged,
+            }
+        ]
     }
 
 
