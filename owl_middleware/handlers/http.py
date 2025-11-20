@@ -317,6 +317,19 @@ async def delete_file_in_container(
     return {"data": {"success": True}}
 
 
+@http_router.get("/health")
+@inject("api_service")
+async def check_health(request: Request, api_service: ApiService):
+    health_check_result = api_service.health_check()
+
+    if health_check_result.is_err():
+        raise HTTPException(status_code=500, detail="Server is not work")
+
+    health_check = health_check_result.unwrap()
+
+    return {"data": {"success": "Success" if (health_check == True) else "Fault"}}
+
+
 @http_router.get("/containers/{container_id}/files")
 @inject("file_service")
 @inject("container_service")
