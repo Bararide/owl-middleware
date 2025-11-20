@@ -228,13 +228,9 @@ async def get_file_content(
             )
             raise HTTPException(status_code=403, detail="Access denied")
 
-        Logger.error("1")
-
         content_result = await api_service.get_file_content(
             str(file_id), str(container_id)
         )
-
-        Logger.error("2")
 
         if content_result.is_err():
             error = content_result.unwrap_err()
@@ -323,11 +319,14 @@ async def check_health(request: Request, api_service: ApiService):
     health_check_result = await api_service.health_check()
 
     if health_check_result.is_err():
-        raise HTTPException(status_code=500, detail="Server is not work")
+        raise HTTPException(status_code=500, detail="Health check failed")
 
     health_check = health_check_result.unwrap()
 
-    return {"data": {"success": "Success" if (health_check == True) else "Fault"}}
+    if not health_check:
+        raise HTTPException(status_code=503, detail="Service unhealthy")
+
+    return {"status": "healthy", "success": True}
 
 
 @http_router.get("/containers/{container_id}/files")
