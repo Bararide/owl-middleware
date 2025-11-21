@@ -608,6 +608,8 @@ async def semantic_search(
     container_id = request.get("container_id")
     limit = request.get("limit", 10)
 
+    Logger.error(f"{container_id}")
+
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
@@ -619,7 +621,7 @@ async def semantic_search(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.id) and not current_user.is_admin:
+    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
     search_result = await api_service.semantic_search(
