@@ -195,11 +195,11 @@ class ApiService:
             ) as response:
 
                 response_text = await response.text()
-                Logger.info(f"Raw response text: {response_text}")
+                # Logger.info(f"Raw response text: {response_text}")
 
                 try:
                     data = json.loads(response_text)
-                    Logger.info(f"Parsed JSON data: {data}")
+                    # Logger.info(f"Parsed JSON data: {data}")
 
                     if response.status == 200:
                         if "data" in data:
@@ -264,11 +264,11 @@ class ApiService:
             ) as response:
 
                 response_text = await response.text()
-                Logger.info(f"Raw response text: {response_text}")
+                # Logger.info(f"Raw response text: {response_text}")
 
                 try:
                     data = json.loads(response_text)
-                    Logger.info(f"Parsed JSON data: {data}")
+                    # Logger.info(f"Parsed JSON data: {data}")
 
                     if response.status == 200:
                         if "data" in data:
@@ -374,8 +374,8 @@ class ApiService:
                 Logger.info(f"Semantic search response: {response.status}")
 
                 response_text = await response.text()
-                Logger.info(f"Raw response text: {response_text}")
-                Logger.info(f"Response headers: {dict(response.headers)}")
+                # Logger.info(f"Raw response text: {response_text}")
+                # Logger.info(f"Response headers: {dict(response.headers)}")
 
                 if response.status == 200:
                     try:
