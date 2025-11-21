@@ -574,6 +574,69 @@ async def create_container(
     }
 
 
+@http_router.post("/search/semantic")
+@inject("api_service")
+@inject("container_service")
+@inject("auth_service")
+async def semantic_search(
+    request: dict,
+    req: Request,
+    api_service: ApiService,
+    container_service: ContainerService,
+    auth_service: AuthService,
+):
+    token = None
+    auth_header = req.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = req.query_params.get("token")
+        Logger.error(f"Query token: {req.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    query = request.get("query", "").strip()
+    container_id = request.get("container_id")
+    limit = request.get("limit", 10)
+
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    if not container_id:
+        raise HTTPException(status_code=400, detail="Container ID is required")
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    container = container_result.unwrap()
+    if container.user_id != str(current_user.id) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    search_result = await api_service.semantic_search(
+        query,
+        current_user,
+        container,
+        limit=limit,
+    )
+
+    if search_result.is_err():
+        raise HTTPException(
+            status_code=500, detail=f"Search error: {search_result.unwrap_err()}"
+        )
+
+    return {"data": search_result.unwrap()}
+
+
 @http_router.delete("/containers/{container_id}")
 @inject("container_service")
 @inject("auth_service")
@@ -850,47 +913,7 @@ async def delete_container(
 #     return {"message": "File deleted successfully"}
 
 
-# # Search endpoints
-# @http_router.post("/search/semantic")
-# async def semantic_search(
-#     request: dict,
-#     current_user: User = Depends(get_current_user),
-#     api_service: ApiService = Depends(lambda: api_service),
-#     container_service: ContainerService = Depends(lambda: container_service),
-# ):
-#     """Perform semantic search"""
-#     query = request.get("query", "").strip()
-#     container_id = request.get("container_id")
-#     limit = request.get("limit", 10)
-
-#     if not query:
-#         raise HTTPException(status_code=400, detail="Query is required")
-
-#     if not container_id:
-#         raise HTTPException(status_code=400, detail="Container ID is required")
-
-#     # Verify container ownership
-#     container_result = await container_service.get_container(container_id)
-#     if container_result.is_err() or not container_result.unwrap():
-#         raise HTTPException(status_code=404, detail="Container not found")
-
-#     container = container_result.unwrap()
-#     if container.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     search_result = await api_service.semantic_search(
-#         query,
-#         current_user,
-#         container,
-#         limit=limit,
-#     )
-
-#     if search_result.is_err():
-#         raise HTTPException(
-#             status_code=500, detail=f"Search error: {search_result.unwrap_err()}"
-#         )
-
-#     return {"data": search_result.unwrap()}
+# Search endpoints
 
 
 # @http_router.post("/search/rebuild-index")
