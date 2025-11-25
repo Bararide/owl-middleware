@@ -633,7 +633,7 @@ async def chat_with_bot(
         query,
         current_user,
         container,
-        limit=15,
+        limit=5,
     )
 
     if search_result.is_err():
@@ -671,8 +671,6 @@ async def chat_with_bot(
                 elif isinstance(content_data_inner, str):
                     content_snippet = content_data_inner
 
-            if content_snippet:
-                content_snippet = content_snippet.strip()[:500]
         else:
             Logger.warning(
                 f"Could not get content for file {file_id}: {content_result.unwrap_err()}"
@@ -693,7 +691,7 @@ async def chat_with_bot(
                 "file_path": file_path,
                 "file_name": file_name,
                 "relevance_score": file_info.get("score", 0.0),
-                "content_snippet": content_snippet[:200] if content_snippet else "",
+                "content_snippet": content_snippet if content_snippet else "",
             }
         )
 
