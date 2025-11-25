@@ -586,20 +586,21 @@ async def create_container(
 @inject("container_service")
 @inject("auth_service")
 @inject("agent_service")
-async def chat_search(
-    request: Request,
+async def chat_with_bot(
+    request: dict,
+    req: Request,
     api_service: ApiService,
     container_service: ContainerService,
     auth_service: AuthService,
     agent_service: AgentService,
 ):
     token = None
-    auth_header = request.headers.get("Authorization")
+    auth_header = req.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:]
     else:
-        token = request.query_params.get("token")
-        Logger.error(f"Query token: {request.query_params.get('token')}")
+        token = req.query_params.get("token")
+        Logger.error(f"Query token: {req.query_params.get('token')}")
 
     if not token:
         Logger.error("No token provided")
@@ -614,6 +615,7 @@ async def chat_search(
 
     query = request.get("query", "").strip()
     container_id = request.get("container_id")
+    conversation_history = request.get("conversation_history", [])
 
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
@@ -626,6 +628,70 @@ async def chat_search(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
+
+    search_result = await api_service.semantic_search(
+        query,
+        current_user,
+        container,
+        limit=5,
+    )
+
+    if search_result.is_err():
+        raise HTTPException(
+            status_code=500, detail=f"Search error: {search_result.unwrap_err()}"
+        )
+
+    search_data = search_result.unwrap()
+
+    context_parts = []
+    used_files = []
+
+    for file_info in search_data.get("results", []):
+        context_parts.append(f"File: {file_info.get('file_path', '')}")
+        context_parts.append(f"Content snippet: {file_info.get('content_snippet', '')}")
+        context_parts.append("---")
+
+        used_files.append(
+            {
+                "file_path": file_info.get("file_path", ""),
+                "file_name": file_info.get("file_name", ""),
+                "relevance_score": file_info.get("relevance_score", 0.0),
+                "content_snippet": file_info.get("content_snippet", "")[:200],
+            }
+        )
+
+    context = "\n".join(context_parts) if context_parts else "No relevant files found."
+
+    chat_result = await agent_service.chat(
+        message=query,
+        conversation_history=conversation_history,
+        user=current_user,
+        system_prompt=f"""You are an AI assistant that helps users analyze their files. 
+        Use the following context from the user's files to answer their question. 
+        If the context doesn't contain relevant information, say so and ask for clarification.
+        
+        Context from files:
+        {context}
+        
+        User question: {query}""",
+    )
+
+    if chat_result.is_err():
+        raise HTTPException(
+            status_code=500, detail=f"Chat error: {chat_result.unwrap_err()}"
+        )
+
+    chat_response = chat_result.unwrap()
+
+    return {
+        "data": {
+            "answer": chat_response.get("content", ""),
+            "used_files": used_files,
+            "conversation_history": chat_response.get("conversation_history", []),
+            "model": chat_response.get("model", ""),
+            "metadata": chat_response.get("metadata", {}),
+        }
+    }
 
 
 @http_router.post("/search/semantic")

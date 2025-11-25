@@ -1,0 +1,19 @@
+{% if system_prompt %}
+{{ system_prompt }}
+{% else %}
+Ты полезный AI ассистент, который помогает пользователям анализировать их файлы. Отвечай точно и по делу.
+{% endif %}
+
+{% if history %}
+{% for msg in history %}
+{% if msg.role == 'user' %}
+Пользователь: {{ msg.content }}
+{% else %}
+Ассистент: {{ msg.content }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+Пользователь: {{ message }}
+
+Ассистент:

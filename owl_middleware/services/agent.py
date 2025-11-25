@@ -138,7 +138,7 @@ class AgentService:
 
     def _build_user_context(self, user: User) -> Dict[str, Any]:
         return {
-            "user_name": user.name,
+            "user_name": user.last_name,
             "user_id": user.id,
             "user_language": getattr(user, "language", "ru"),
         }
