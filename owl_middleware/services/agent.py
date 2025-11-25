@@ -155,16 +155,23 @@ class AgentService:
     ) -> Result[Dict[str, Any], str]:
         conversation_history = conversation_history or []
 
+        full_context = system_prompt or "Ты полезный AI ассистент."
+
+        if conversation_history:
+            history_text = "\n".join(
+                [f"{msg['role']}: {msg['content']}" for msg in conversation_history]
+            )
+            full_context += f"\n\nИстория разговора:\n{history_text}"
+
         context = {
-            "history": conversation_history,
-            "message": message,
-            "system_prompt": system_prompt or "Ты полезный AI ассистент.",
+            "context": full_context,
+            "question": message,
         }
 
         if user:
             context.update(self._build_user_context(user))
 
-        result = await self.generate_response("chat", context, user)
+        result = await self.generate_response("rag", context, user)
 
         if result.is_ok():
             response_data = result.unwrap()
