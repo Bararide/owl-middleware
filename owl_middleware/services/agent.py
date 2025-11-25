@@ -81,7 +81,9 @@ class AgentService:
 
     async def _ensure_initialized(self) -> Result[bool, str]:
         if not self._initialized or not self._llm_model:
-            return await self.initialize()
+            init_result = await self.initialize()
+            if init_result.is_err():
+                return Err(init_result.unwrap_err())
         return Ok(True)
 
     @result_try
@@ -93,7 +95,7 @@ class AgentService:
         **kwargs,
     ) -> Result[Dict[str, Any], str]:
         init_result = await self._ensure_initialized()
-        if init_result.is_err:
+        if init_result.is_err():
             return Err(init_result.unwrap_err())
 
         try:
@@ -164,7 +166,7 @@ class AgentService:
 
         result = await self.generate_response("chat", context, user)
 
-        if result.is_ok:
+        if result.is_ok():
             response_data = result.unwrap()
             new_history = conversation_history + [
                 {"role": "user", "content": message},
@@ -195,7 +197,7 @@ class AgentService:
         self, requests: List[Dict[str, Any]]
     ) -> Result[List[Dict[str, Any]], str]:
         init_result = await self._ensure_initialized()
-        if init_result.is_err:
+        if init_result.is_err():
             return Err(init_result.unwrap_err())
 
         try:
@@ -217,14 +219,19 @@ class AgentService:
                         {"error": str(result), "success": False, "index": i}
                     )
                 elif hasattr(result, "is_ok"):
-                    if result.is_ok:
+                    if result.is_ok():
                         processed_results.append(
                             {**result.unwrap(), "success": True, "index": i}
                         )
                     else:
-                        processed_results.append(
-                            {"error": result.unwrap_err(), "success": False, "index": i}
-                        )
+                        if result.is_err():
+                            processed_results.append(
+                                {
+                                    "error": result.unwrap_err(),
+                                    "success": False,
+                                    "index": i,
+                                }
+                            )
 
             return Ok(processed_results)
 
@@ -234,7 +241,7 @@ class AgentService:
     @result_try
     async def get_available_prompts(self) -> Result[List[str], str]:
         init_result = await self._ensure_initialized()
-        if init_result.is_err:
+        if init_result.is_err():
             return Err(init_result.unwrap_err())
 
         try:
@@ -252,7 +259,7 @@ class AgentService:
         try:
             init_result = await self._ensure_initialized()
 
-            if init_result.is_err:
+            if init_result.is_err():
                 return {
                     "status": "unhealthy",
                     "error": init_result.unwrap_err(),
@@ -264,16 +271,15 @@ class AgentService:
             )
 
             return {
-                "status": "healthy" if test_result.is_ok else "degraded",
+                "status": "healthy" if test_result.is_ok() else "degraded",
                 "initialized": self._initialized,
                 "model": self._model_name,
                 "prompts_available": (
                     len((await self.get_available_prompts()).unwrap())
-                    if test_result.is_ok
+                    if test_result.is_ok()
                     else 0
                 ),
-                "test_successful": test_result.is_ok,
-                "error": test_result.unwrap_err() if test_result.is_err else None,
+                "test_successful": test_result.is_ok(),
             }
 
         except Exception as e:
