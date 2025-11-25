@@ -23,6 +23,8 @@ ruff = "^0.13.0"
 pymupdf = "^1.26.5"
 email-validator = "^2.3.0"
 pyjwt = "^2.10.1"
+langchain = {extras = ["mistralai"], version = "^1.1.0"}
+langchain-community = "^0.4.1"
 
 
 [build-system]
