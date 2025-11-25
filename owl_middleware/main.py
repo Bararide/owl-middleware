@@ -172,6 +172,7 @@ async def main() -> None:
     bot.app.state.context_service = context_service
     bot.app.state.container_service = container_service
     bot.app.state.text_service = text_service
+    bot.app.state.agent_service = agent_service
     bot.app.state.user_resolver = resolvers.resolve_user
 
     use_webhook = getenv("USE_WEBHOOK", "").lower() == "true"
