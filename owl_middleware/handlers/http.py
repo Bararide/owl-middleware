@@ -633,7 +633,7 @@ async def chat_with_bot(
         query,
         current_user,
         container,
-        limit=5,
+        limit=15,
     )
 
     if search_result.is_err():
@@ -642,38 +642,77 @@ async def chat_with_bot(
         )
 
     search_data = search_result.unwrap()
+    Logger.info(f"Semantic search response: {search_data}")
 
     context_parts = []
     used_files = []
 
     for file_info in search_data.get("results", []):
-        context_parts.append(f"File: {file_info.get('file_path', '')}")
-        context_parts.append(f"Content snippet: {file_info.get('content_snippet', '')}")
+        file_path = file_info.get("path", "")
+
+        file_id = file_path.split("/")[-1] if "/" in file_path else file_path
+
+        content_result = await api_service.get_file_content(file_id, container_id)
+
+        content_snippet = ""
+        if content_result.is_ok():
+            content_data = content_result.unwrap()
+            if isinstance(content_data, str):
+                content_snippet = content_data
+            elif isinstance(content_data, dict) and "content" in content_data:
+                content_snippet = content_data["content"]
+            elif isinstance(content_data, dict) and "data" in content_data:
+                content_data_inner = content_data["data"]
+                if (
+                    isinstance(content_data_inner, dict)
+                    and "content" in content_data_inner
+                ):
+                    content_snippet = content_data_inner["content"]
+                elif isinstance(content_data_inner, str):
+                    content_snippet = content_data_inner
+
+            if content_snippet:
+                content_snippet = content_snippet.strip()[:500]
+        else:
+            Logger.warning(
+                f"Could not get content for file {file_id}: {content_result.unwrap_err()}"
+            )
+
+        file_name = file_path.split("/")[-1] if "/" in file_path else file_id
+
+        context_parts.append(f"File: {file_name}")
+        context_parts.append(f"Path: {file_path}")
+        if content_snippet:
+            context_parts.append(f"Content: {content_snippet}")
+        else:
+            context_parts.append("Content: [No content available or file is empty]")
         context_parts.append("---")
 
         used_files.append(
             {
-                "file_path": file_info.get("file_path", ""),
-                "file_name": file_info.get("file_name", ""),
-                "relevance_score": file_info.get("relevance_score", 0.0),
-                "content_snippet": file_info.get("content_snippet", "")[:200],
+                "file_path": file_path,
+                "file_name": file_name,
+                "relevance_score": file_info.get("score", 0.0),
+                "content_snippet": content_snippet[:200] if content_snippet else "",
             }
         )
 
     context = "\n".join(context_parts) if context_parts else "No relevant files found."
+
+    Logger.info(f"Final context for AI: {context}")
 
     chat_result = await agent_service.chat(
         message=query,
         conversation_history=conversation_history,
         user=current_user,
         system_prompt=f"""You are an AI assistant that helps users analyze their files. 
-        Use the following context from the user's files to answer their question. 
-        If the context doesn't contain relevant information, say so and ask for clarification.
         
-        Context from files:
-        {context}
-        
-        User question: {query}""",
+Context from files:
+{context}
+
+User question: {query}
+
+Analyze the file contents and provide a helpful response. If the files don't contain relevant information, explain this politely and suggest what the user can do next.""",
     )
 
     if chat_result.is_err():
