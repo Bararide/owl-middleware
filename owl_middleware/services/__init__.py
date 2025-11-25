@@ -5,6 +5,7 @@ from .api import ApiService
 from .container import ContainerService
 from .pdf import TextService
 from .valito import HanaValidator
+from .agent import AgentService
 
 __all__ = [
     "AuthService",
@@ -14,4 +15,5 @@ __all__ = [
     "ContainerService",
     "TextService",
     "HanaValidator",
+    "AgentService",
 ]
