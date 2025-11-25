@@ -14,7 +14,14 @@ from datetime import datetime
 
 from fastbot.decorators import inject
 from fastbot.logger import Logger
-from services import AuthService, FileService, ApiService, ContainerService, TextService
+from services import (
+    AuthService,
+    FileService,
+    ApiService,
+    ContainerService,
+    TextService,
+    AgentService,
+)
 from models import User, Container as ContainerModel, File as FileModel
 
 http_router = APIRouter()
@@ -574,6 +581,53 @@ async def create_container(
     }
 
 
+@http_router.post("/chat")
+@inject("api_service")
+@inject("container_service")
+@inject("auth_service")
+@inject("agent_service")
+async def chat_search(
+    request: Request,
+    api_service: ApiService,
+    container_service: ContainerService,
+    auth_service: AuthService,
+    agent_service: AgentService,
+):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    query = request.get("query", "").strip()
+    container_id = request.get("container_id")
+
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    if not container_id:
+        raise HTTPException(status_code=400, detail="Container ID is required")
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    container = container_result.unwrap()
+
+
 @http_router.post("/search/semantic")
 @inject("api_service")
 @inject("container_service")
@@ -607,8 +661,6 @@ async def semantic_search(
     query = request.get("query", "").strip()
     container_id = request.get("container_id")
     limit = request.get("limit", 10)
-
-    Logger.error(f"{container_id}")
 
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
