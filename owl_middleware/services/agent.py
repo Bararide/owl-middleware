@@ -94,7 +94,7 @@ class AgentService:
     ) -> Result[Dict[str, Any], str]:
         init_result = await self._ensure_initialized()
         if init_result.is_err:
-            return Err(init_result.err_value)
+            return Err(init_result.unwrap_err())
 
         try:
             if prompt_type.endswith(".jinja2"):
@@ -165,7 +165,7 @@ class AgentService:
         result = await self.generate_response("chat", context, user)
 
         if result.is_ok:
-            response_data = result.ok_value
+            response_data = result.unwrap()
             new_history = conversation_history + [
                 {"role": "user", "content": message},
                 {"role": "assistant", "content": response_data["content"]},
@@ -196,7 +196,7 @@ class AgentService:
     ) -> Result[List[Dict[str, Any]], str]:
         init_result = await self._ensure_initialized()
         if init_result.is_err:
-            return Err(init_result.err_value)
+            return Err(init_result.unwrap_err())
 
         try:
             tasks = []
@@ -219,11 +219,11 @@ class AgentService:
                 elif hasattr(result, "is_ok"):
                     if result.is_ok:
                         processed_results.append(
-                            {**result.ok_value, "success": True, "index": i}
+                            {**result.unwrap(), "success": True, "index": i}
                         )
                     else:
                         processed_results.append(
-                            {"error": result.err_value, "success": False, "index": i}
+                            {"error": result.unwrap_err(), "success": False, "index": i}
                         )
 
             return Ok(processed_results)
@@ -235,7 +235,7 @@ class AgentService:
     async def get_available_prompts(self) -> Result[List[str], str]:
         init_result = await self._ensure_initialized()
         if init_result.is_err:
-            return Err(init_result.err_value)
+            return Err(init_result.unwrap_err())
 
         try:
             factory_prompts = PromptFactory.get_available_prompts()
@@ -255,7 +255,7 @@ class AgentService:
             if init_result.is_err:
                 return {
                     "status": "unhealthy",
-                    "error": init_result.err_value,
+                    "error": init_result.unwrap_err(),
                     "initialized": False,
                 }
 
@@ -268,12 +268,12 @@ class AgentService:
                 "initialized": self._initialized,
                 "model": self._model_name,
                 "prompts_available": (
-                    len((await self.get_available_prompts()).ok_value)
+                    len((await self.get_available_prompts()).unwrap())
                     if test_result.is_ok
                     else 0
                 ),
                 "test_successful": test_result.is_ok,
-                "error": test_result.err_value if test_result.is_err else None,
+                "error": test_result.unwrap_err() if test_result.is_err else None,
             }
 
         except Exception as e:
