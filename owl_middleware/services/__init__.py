@@ -6,6 +6,7 @@ from .container import ContainerService
 from .pdf import TextService
 from .valito import HanaValidator
 from .agent import AgentService
+from .ocr import Ocr
 
 __all__ = [
     "AuthService",
@@ -16,4 +17,5 @@ __all__ = [
     "TextService",
     "HanaValidator",
     "AgentService",
+    "Ocr",
 ]

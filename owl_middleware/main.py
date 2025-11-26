@@ -73,6 +73,7 @@ async def main() -> None:
     agent_service = services.AgentService(
         getenv("MISTRAL_API_KEY"), "owl_middleware/templates/prompts"
     )
+    ocr_service = services.Ocr(getenv("DEEPSEEK_API_KEY"), getenv("DS_OCR_BASE_URL"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
@@ -94,6 +95,7 @@ async def main() -> None:
     bot_builder.add_dependency("container_service", container_service)
     bot_builder.add_dependency("text_service", text_service)
     bot_builder.add_dependency("agent_service", agent_service)
+    bot_builder.add_dependency("ocr_service", ocr_service)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)
