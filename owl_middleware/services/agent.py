@@ -99,7 +99,7 @@ class AgentService:
             return Err(init_result.unwrap_err())
 
         try:
-            if prompt_type.endswith(".jinja2"):
+            if prompt_type.endswith(".j2"):
                 rendered = await self._prompt_engine.render(prompt_type, **context)
                 prompt_text = rendered["text"]
             else:

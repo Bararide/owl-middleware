@@ -616,6 +616,7 @@ async def chat_with_bot(
     query = request.get("query", "").strip()
     container_id = request.get("container_id")
     conversation_history = request.get("conversation_history", [])
+    limit = request.get("limit", 5)
 
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
@@ -629,11 +630,25 @@ async def chat_with_bot(
 
     container = container_result.unwrap()
 
+    # base_theme_of_query = await agent_service.generate_response(
+    #     prompt_type="base_theme.j2",
+    #     context={"message": query},
+    # )
+
+    # if base_theme_of_query.is_err():
+    #     Logger.error(f"Error generating base theme: {base_theme_of_query.unwrap_err()}")
+    #     base_theme = query
+    # else:
+    #     base_theme_data = base_theme_of_query.unwrap()
+    # base_theme = base_theme_data.get("content", query).strip()
+
+    # Logger.info(f"Base theme for search: {base_theme}")
+
     search_result = await api_service.semantic_search(
         query,
         current_user,
         container,
-        limit=5,
+        limit,
     )
 
     if search_result.is_err():
@@ -642,7 +657,7 @@ async def chat_with_bot(
         )
 
     search_data = search_result.unwrap()
-    Logger.info(f"Semantic search response: {search_data}")
+    # Logger.info(f"Semantic search response: {search_data}")
 
     context_parts = []
     used_files = []
@@ -697,7 +712,7 @@ async def chat_with_bot(
 
     context = "\n".join(context_parts) if context_parts else "No relevant files found."
 
-    Logger.info(f"Final context for AI: {context}")
+    # Logger.info(f"Final context for AI: {context}")
 
     chat_result = await agent_service.chat(
         message=query,
