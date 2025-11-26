@@ -13,6 +13,7 @@ from .handlers import (
     handle_download_file,
     handle_select_container,
     handle_get_token,
+    handle_process_photo,
 )
 
 from .http import http_router
@@ -34,4 +35,5 @@ __all__ = [
     "handle_select_container",
     "http_router",
     "handle_get_token",
+    "handle_process_photo",
 ]

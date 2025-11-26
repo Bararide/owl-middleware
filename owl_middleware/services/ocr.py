@@ -15,7 +15,7 @@ class Ocr:
 
     @result_try
     async def extract(self, document: Union[str, BinaryIO]) -> str:
-        result = await self._ocr.recognize(document)
+        result = await self._ocr(document)
 
         if hasattr(result, "text"):
             return result.text

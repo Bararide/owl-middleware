@@ -24,6 +24,7 @@ from .context import (
     download_selection_context,
     file_preview_context,
     get_token_context,
+    process_photo_context,
 )
 
 __all__ = [
@@ -52,4 +53,5 @@ __all__ = [
     "download_selection_context",
     "file_preview_context",
     "get_token_context",
+    "process_photo_context",
 ]

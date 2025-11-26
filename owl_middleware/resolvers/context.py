@@ -80,6 +80,38 @@ async def file_upload_context(
     }
 
 
+@register_context("process_photo")
+async def process_photo_context(
+    success: bool = False,
+    extracted_text: str = "",
+    characters_count: int = 0,
+    container_name: str = "",
+    file_id: str = "",
+    error: str = "",
+    is_truncated: bool = False,
+):
+    return {
+        "success": success,
+        "extracted_text": extracted_text,
+        "characters_count": characters_count,
+        "container_name": container_name,
+        "file_id": file_id,
+        "error": error,
+        "is_truncated": is_truncated,
+        "has_text": bool(extracted_text.strip()),
+        "text_preview": (
+            extracted_text[:100] + "..."
+            if len(extracted_text) > 100
+            else extracted_text
+        ),
+        "characters_k": (
+            f"{characters_count / 1000:.1f}k"
+            if characters_count >= 1000
+            else str(characters_count)
+        ),
+    }
+
+
 @register_context("get_token")
 async def get_token_context(
     success: bool = False,

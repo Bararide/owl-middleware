@@ -6,7 +6,14 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
-from services import AuthService, FileService, ApiService, ContainerService, TextService
+from services import (
+    AuthService,
+    FileService,
+    ApiService,
+    ContainerService,
+    TextService,
+    Ocr,
+)
 from fastbot.decorators import (
     with_template_engine,
     with_parse_mode,
@@ -565,6 +572,156 @@ async def handle_search(
             "semantic_search", query=query, results=results, count=len(results)
         )
     }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
+@with_auto_reply("commands/process_photo.j2")
+async def handle_process_photo(
+    message: Message,
+    user: User,
+    template_engine: TemplateEngine,
+    file_service: FileService,
+    container_service: ContainerService,
+    api_service: ApiService,
+    ocr_service: Ocr,
+    context_engine: ContextEngine,
+):
+    if not message.photo:
+        return {
+            "context": await context_engine.get(
+                "process_photo", error="Пожалуйста, отправьте фотографию"
+            )
+        }
+
+    containers_result = await container_service.get_containers_by_user_id(
+        str(user.tg_id)
+    )
+
+    if containers_result.is_err():
+        return {
+            "context": await context_engine.get(
+                "process_photo",
+                error="Ошибка при получении контейнеров. Сначала создайте контейнер.",
+            )
+        }
+
+    containers = containers_result.unwrap()
+
+    if not containers:
+        return {
+            "context": await context_engine.get(
+                "process_photo",
+                error="У вас нет контейнеров. Сначала создайте контейнер командой /container",
+            )
+        }
+
+    container = containers[0]
+
+    try:
+        photo = message.photo[-1]
+
+        Logger.info(f"Processing photo: {photo.file_id}, size: {photo.file_size} bytes")
+
+        file_info = await message.bot.get_file(photo.file_id)
+        file_content = await message.bot.download_file(file_info.file_path)
+        photo_data = file_content.read()
+
+        Logger.info("Starting OCR processing...")
+        extracted_text = await ocr_service.extract_from_bytes(
+            photo_data, f"photo_{photo.file_id}.jpg"
+        )
+        Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
+
+        if not extracted_text.unwrap().strip():
+            return {
+                "context": await context_engine.get(
+                    "process_photo",
+                    error="Не удалось распознать текст на фотографии. Попробуйте с более четким изображением.",
+                )
+            }
+
+        file_data = {
+            "id": f"photo_ocr_{photo.file_id}",
+            "container_id": container.id,
+            "name": f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            "size": len(extracted_text.encode("utf-8")),
+            "user_id": str(user.tg_id),
+            "created_at": datetime.now(),
+            "mime_type": "text/plain",
+        }
+
+        db_result = await file_service.create_file(file_data)
+
+        if db_result.is_err():
+            error = db_result.unwrap_err()
+            Logger.error(f"Error creating file in DB: {error}")
+            return {
+                "context": await context_engine.get(
+                    "process_photo", error=f"Ошибка базы данных: {error}"
+                )
+            }
+
+        file = db_result.unwrap()
+
+        api_result = await api_service.create_file(
+            path=file.id,
+            content=extracted_text,
+            user_id=str(user.tg_id),
+            container_id=container.id,
+        )
+
+        if api_result.is_err():
+            await file_service.delete_file(file.id)
+            error = api_result.unwrap_err()
+            Logger.error(f"Error saving OCR result to storage: {error}")
+            return {
+                "context": await context_engine.get(
+                    "process_photo", error=f"Ошибка сохранения результата: {error}"
+                )
+            }
+
+        if len(extracted_text) <= 4000:
+            preview_text = extracted_text
+        else:
+            preview_text = extracted_text[:4000] + "\n\n... (текст обрезан)"
+
+        file_to_send = BufferedInputFile(
+            extracted_text.encode("utf-8"),
+            filename=f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        )
+
+        await message.answer_document(
+            document=file_to_send,
+            caption=f"📸 Распознанный текст с фотографии\n"
+            f"📊 Символов: {len(extracted_text)}\n"
+            f"📁 Контейнер: {container.id}",
+        )
+
+        Logger.info(
+            f"Photo OCR completed successfully: {photo.file_id} for user {user.tg_id}, "
+            f"extracted {len(extracted_text)} characters"
+        )
+
+        return {
+            "context": await context_engine.get(
+                "process_photo",
+                success=True,
+                extracted_text=preview_text,
+                characters_count=len(extracted_text),
+                container_name=container.id,
+                file_id=file.id,
+                is_truncated=len(extracted_text) > 4000,
+            )
+        }
+
+    except Exception as e:
+        Logger.error(f"Error processing photo with OCR: {e}")
+        return {
+            "context": await context_engine.get(
+                "process_photo", error=f"Ошибка обработки фотографии: {str(e)}"
+            )
+        }
 
 
 @with_template_engine

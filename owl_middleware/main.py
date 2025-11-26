@@ -125,6 +125,7 @@ async def main() -> None:
             resolvers.download_file_context,
             resolvers.file_preview_context,
             resolvers.get_token_context,
+            resolvers.process_photo_context,
         ]
     )
 
@@ -160,6 +161,8 @@ async def main() -> None:
     )
 
     await bot_builder.add_handler(handlers.handle_file_upload, F.document)
+
+    await bot_builder.add_handler(handlers.handle_process_photo, F.photo)
 
     bot_builder.add_http_router(handlers.http_router)
 
