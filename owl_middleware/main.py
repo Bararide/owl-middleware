@@ -73,7 +73,7 @@ async def main() -> None:
     agent_service = services.AgentService(
         getenv("MISTRAL_API_KEY"), "owl_middleware/templates/prompts"
     )
-    ocr_service = services.Ocr(getenv("DEEPSEEK_API_KEY"), getenv("DS_OCR_BASE_URL"))
+    ocr_service = services.Ocr(getenv("NOVITA_API_KEY"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
     bot_builder = (
