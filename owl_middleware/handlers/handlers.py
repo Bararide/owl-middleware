@@ -643,59 +643,40 @@ async def handle_process_photo(
         extracted_text = ocr_result.unwrap()
         Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
 
+        cleaned_text = ocr_service.clean_html_tags(extracted_text)
+        Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
+
         file_data = {
             "id": f"photo_ocr_{photo.file_id}",
             "container_id": container.id,
             "name": f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            "size": len(extracted_text.encode("utf-8")),
-            "user_id": str(user.tg_id),
+            "size": len(cleaned_text.encode("utf-8")),
+            "user_id": str(user.id),
             "created_at": datetime.now(),
             "mime_type": "text/plain",
         }
 
-        # db_result = await file_service.create_file(file_data)
-        # if db_result.is_err():
-        #     error = db_result.unwrap_err()
-        #     Logger.error(f"Error creating file in DB: {error}")
-        #     return {
-        #         "context": await context_engine.get(
-        #             "process_photo", error=f"Ошибка базы данных: {error}"
-        #         )
-        #     }
-
-        # file = db_result.unwrap()
-
         api_result = await api_service.create_file(
             path=file_data["name"],
-            content=extracted_text,
-            user_id=str(user.tg_id),
+            content=cleaned_text,
+            user_id=str(user.id),
             container_id=container.id,
         )
 
-        # if api_result.is_err():
-        #     await file_service.delete_file(file.id)
-        #     error = api_result.unwrap_err()
-        #     Logger.error(f"Error saving OCR result to storage: {error}")
-        #     return {
-        #         "context": await context_engine.get(
-        #             "process_photo", error=f"Ошибка сохранения: {error}"
-        #         )
-        #     }
-
         file_to_send = BufferedInputFile(
-            extracted_text.encode("utf-8"),
+            cleaned_text.encode("utf-8"),
             filename=f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
         )
 
         await message.answer_document(
             document=file_to_send,
-            caption=f"📸 Распознанный текст\n📊 Символов: {len(extracted_text)}\n📁 Контейнер: {container.id}",
+            caption=f"📸 Распознанный текст\n📊 Символов: {len(cleaned_text)}\n📁 Контейнер: {container.id}",
         )
 
-        if len(extracted_text) <= 4000:
-            preview_text = extracted_text
+        if len(cleaned_text) <= 4000:
+            preview_text = cleaned_text
         else:
-            preview_text = extracted_text[:4000] + "\n\n... (текст обрезан)"
+            preview_text = cleaned_text[:4000] + "\n\n... (текст обрезан)"
 
         Logger.info(f"Photo OCR completed successfully for user {user.tg_id}")
 
@@ -704,10 +685,10 @@ async def handle_process_photo(
                 "process_photo",
                 success=True,
                 extracted_text=preview_text,
-                characters_count=len(extracted_text),
+                characters_count=len(cleaned_text),
                 container_name=container.id,
                 file_id=file_data["name"],
-                is_truncated=len(extracted_text) > 4000,
+                is_truncated=len(cleaned_text) > 4000,
             )
         }
 

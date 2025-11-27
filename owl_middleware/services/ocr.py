@@ -20,6 +20,17 @@ class Ocr:
             Logger.error(f"Failed to initialize OpenAI client: {e}")
             raise
 
+    def clean_html_tags(self, text: str) -> str:
+        import re
+
+        text = re.sub(r"<[^>]+>", "", text)
+
+        text = re.sub(r"\n\s*\n", "\n\n", text)
+        text = re.sub(r" +", " ", text)
+        text = text.strip()
+
+        return text
+
     async def extract_from_bytes(
         self, file_data: bytes, filename: str = "document"
     ) -> Result[str, Exception]:
