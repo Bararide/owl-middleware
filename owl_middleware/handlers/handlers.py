@@ -622,12 +622,12 @@ async def handle_process_photo(
 
         file_info = await message.bot.get_file(photo.file_id)
         file_content = await message.bot.download_file(file_info.file_path)
-        photo_data = file_content.read()
+        original_photo_data = file_content.read()
 
         Logger.info("Starting OCR processing...")
 
         ocr_result = await ocr_service.extract_from_bytes(
-            photo_data, f"photo_{photo.file_id}.jpg"
+            original_photo_data, f"photo_{photo.file_id}.jpg"
         )
 
         if ocr_result.is_err():
@@ -642,6 +642,10 @@ async def handle_process_photo(
 
         extracted_text = ocr_result.unwrap()
         Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
+
+        visualized_photo_data = ocr_service.draw_bounding_boxes(
+            original_photo_data, extracted_text
+        )
 
         cleaned_text = ocr_service.clean_html_tags(extracted_text)
         Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
@@ -663,6 +667,18 @@ async def handle_process_photo(
             container_id=container.id,
         )
 
+        visualized_photo = BufferedInputFile(
+            visualized_photo_data,
+            filename=f"ocr_visualized_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+        )
+
+        await message.answer_photo(
+            photo=visualized_photo,
+            caption=f"🔍 Визуализация распознанного текста\n"
+            f"📊 Распознано блоков: {len(ocr_service.parse_bounding_boxes(extracted_text))}\n"
+            f"📁 Контейнер: {container.id}",
+        )
+
         file_to_send = BufferedInputFile(
             cleaned_text.encode("utf-8"),
             filename=f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
@@ -670,7 +686,7 @@ async def handle_process_photo(
 
         await message.answer_document(
             document=file_to_send,
-            caption=f"📸 Распознанный текст\n📊 Символов: {len(cleaned_text)}\n📁 Контейнер: {container.id}",
+            caption=f"📄 Распознанный текст\n📊 Символов: {len(cleaned_text)}",
         )
 
         if len(cleaned_text) <= 4000:
@@ -689,6 +705,7 @@ async def handle_process_photo(
                 container_name=container.id,
                 file_id=file_data["name"],
                 is_truncated=len(cleaned_text) > 4000,
+                boxes_count=len(ocr_service.parse_bounding_boxes(extracted_text)),
             )
         }
 

@@ -1,6 +1,10 @@
+import io
+import re
+from typing import List, Tuple
 from openai import OpenAI
 import base64
 import os
+from PIL import Image, ImageDraw
 from fastbot.core import Ok, Err, Result
 from fastbot.logger.logger import Logger
 
@@ -30,6 +34,52 @@ class Ocr:
         text = text.strip()
 
         return text
+
+    def parse_bounding_boxes(self, ocr_output: str) -> List[Tuple[str, List[int]]]:
+        boxes = []
+
+        pattern = r"([^[]+)\[\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]\]"
+        matches = re.findall(pattern, ocr_output)
+
+        for match in matches:
+            text = match[0].strip()
+            if text:
+                coords = [int(match[1]), int(match[2]), int(match[3]), int(match[4])]
+                boxes.append((text, coords))
+
+        Logger.info(f"Parsed {len(boxes)} bounding boxes")
+        return boxes
+
+    def draw_bounding_boxes(self, image_data: bytes, ocr_output: str) -> bytes:
+        try:
+            boxes = self.parse_bounding_boxes(ocr_output)
+            if not boxes:
+                Logger.warning("No bounding boxes found to draw")
+                return image_data
+
+            image = Image.open(io.BytesIO(image_data))
+            draw = ImageDraw.Draw(image)
+
+            colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta"]
+
+            for i, (text, bbox) in enumerate(boxes):
+                color = colors[i % len(colors)]
+
+                draw.rectangle(bbox, outline=color, width=3)
+
+                text_position = (bbox[0], bbox[1] - 20)
+                draw.text(text_position, str(i + 1), fill=color)
+
+            output_buffer = io.BytesIO()
+            image.save(output_buffer, format="JPEG", quality=85)
+            output_buffer.seek(0)
+
+            Logger.info(f"Drew {len(boxes)} bounding boxes on image")
+            return output_buffer.getvalue()
+
+        except Exception as e:
+            Logger.error(f"Error drawing bounding boxes: {e}")
+            return image_data
 
     async def extract_from_bytes(
         self, file_data: bytes, filename: str = "document"
