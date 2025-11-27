@@ -39,13 +39,14 @@ class Ocr:
         boxes = []
 
         pattern = r"([^[]+)\[\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]\]"
-        matches = re.findall(pattern, ocr_output)
 
+        matches = re.findall(pattern, ocr_output)
         for match in matches:
             text = match[0].strip()
             if text:
                 coords = [int(match[1]), int(match[2]), int(match[3]), int(match[4])]
                 boxes.append((text, coords))
+                Logger.info(f"Found box: '{text[:50]}...' at {coords}")
 
         Logger.info(f"Parsed {len(boxes)} bounding boxes")
         return boxes
@@ -60,15 +61,44 @@ class Ocr:
             image = Image.open(io.BytesIO(image_data))
             draw = ImageDraw.Draw(image)
 
+            width, height = image.width, image.height
+            Logger.info(f"Original image size: {width}, {height}")
+
             colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta"]
 
-            for i, (text, bbox) in enumerate(boxes):
+            max_y = max([bbox[3] for _, bbox in boxes])
+            Logger.info(f"Max Y coordinate: {max_y}")
+
+            for i, (_, bbox) in enumerate(boxes):
                 color = colors[i % len(colors)]
 
-                draw.rectangle(bbox, outline=color, width=3)
+                x1, y1, x2, y2 = map(int, bbox)
 
-                text_position = (bbox[0], bbox[1] - 20)
-                draw.text(text_position, str(i + 1), fill=color)
+                original_height = y2 - y1
+                Logger.info(f"Box {i+1}: original height = {original_height}px")
+
+                position_factor = y1 / max_y
+                shift_amount = int(275 * position_factor)
+
+                if original_height < 30:
+                    height_multiplier = 2.0
+                elif original_height < 50:
+                    height_multiplier = 1.6
+                else:
+                    height_multiplier = 1.3
+
+                new_height = int(original_height * height_multiplier)
+
+                y1_shifted = y1 + shift_amount
+                y2_shifted = y1_shifted + new_height
+
+                Logger.info(
+                    f"Box {i+1}: original height={original_height}px, new height={new_height}px, shift={shift_amount}px"
+                )
+
+                draw.rectangle([x1, y1_shifted, x2, y2_shifted], outline=color, width=3)
+
+                draw.text((x1, y1_shifted - 15), str(i + 1), fill=color)
 
             output_buffer = io.BytesIO()
             image.save(output_buffer, format="JPEG", quality=85)

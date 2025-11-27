@@ -89,6 +89,7 @@ async def process_photo_context(
     file_id: str = "",
     error: str = "",
     is_truncated: bool = False,
+    boxes_count: int = 0,
 ):
     return {
         "success": success,
@@ -109,6 +110,7 @@ async def process_photo_context(
             if characters_count >= 1000
             else str(characters_count)
         ),
+        "boxes_count": boxes_count,
     }
 
 

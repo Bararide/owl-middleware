@@ -653,7 +653,7 @@ async def handle_process_photo(
         file_data = {
             "id": f"photo_ocr_{photo.file_id}",
             "container_id": container.id,
-            "name": f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            "name": f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             "size": len(cleaned_text.encode("utf-8")),
             "user_id": str(user.id),
             "created_at": datetime.now(),
