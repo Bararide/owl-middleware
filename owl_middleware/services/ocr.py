@@ -58,19 +58,42 @@ class Ocr:
                 Logger.warning("No bounding boxes found to draw")
                 return image_data
 
-            image = Image.open(io.BytesIO(image_data))
+            image = Image.open(io.BytesIO(image_data)).convert("RGBA")
+
+            overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+            draw_overlay = ImageDraw.Draw(overlay)
+
             draw = ImageDraw.Draw(image)
 
             width, height = image.width, image.height
             Logger.info(f"Original image size: {width}, {height}")
 
-            colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta"]
+            colors = [
+                (255, 0, 0),  # red
+                (0, 0, 255),  # blue
+                (0, 128, 0),  # green
+                (255, 165, 0),  # orange
+                (128, 0, 128),  # purple
+                (0, 255, 255),  # cyan
+                (255, 0, 255),  # magenta
+            ]
+
+            transparent_colors = [
+                (255, 0, 0, 80),  # red
+                (0, 0, 255, 80),  # blue
+                (0, 128, 0, 80),  # green
+                (255, 165, 0, 80),  # orange
+                (128, 0, 128, 80),  # purple
+                (0, 255, 255, 80),  # cyan
+                (255, 0, 255, 80),  # magenta
+            ]
 
             max_y = max([bbox[3] for _, bbox in boxes])
             Logger.info(f"Max Y coordinate: {max_y}")
 
             for i, (_, bbox) in enumerate(boxes):
                 color = colors[i % len(colors)]
+                transparent_color = transparent_colors[i % len(transparent_colors)]
 
                 x1, y1, x2, y2 = map(int, bbox)
 
@@ -80,9 +103,7 @@ class Ocr:
                 position_factor = y1 / max_y
                 shift_amount = int(275 * position_factor)
 
-                if original_height < 30:
-                    height_multiplier = 2.0
-                elif original_height < 50:
+                if original_height < 50:
                     height_multiplier = 1.6
                 else:
                     height_multiplier = 1.3
@@ -96,15 +117,26 @@ class Ocr:
                     f"Box {i+1}: original height={original_height}px, new height={new_height}px, shift={shift_amount}px"
                 )
 
+                draw_overlay.rectangle(
+                    [x1, y1_shifted, x2, y2_shifted], fill=transparent_color
+                )
+
                 draw.rectangle([x1, y1_shifted, x2, y2_shifted], outline=color, width=3)
 
-                draw.text((x1, y1_shifted - 15), str(i + 1), fill=color)
+                text = str(i + 1)
+                text_bbox = draw.textbbox((x1, y1_shifted - 15), text)
+                draw.rectangle(text_bbox, fill=color)
+                draw.text((x1, y1_shifted - 15), text, fill="white")
+
+            image = Image.alpha_composite(image, overlay)
+
+            image = image.convert("RGB")
 
             output_buffer = io.BytesIO()
             image.save(output_buffer, format="JPEG", quality=85)
             output_buffer.seek(0)
 
-            Logger.info(f"Drew {len(boxes)} bounding boxes on image")
+            Logger.info(f"Drew {len(boxes)} bounding boxes with transparent fill")
             return output_buffer.getvalue()
 
         except Exception as e:
