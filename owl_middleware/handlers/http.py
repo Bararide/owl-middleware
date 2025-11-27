@@ -648,7 +648,7 @@ async def chat_with_bot(
         query,
         current_user,
         container,
-        limit,
+        limit=10,
     )
 
     if search_result.is_err():
