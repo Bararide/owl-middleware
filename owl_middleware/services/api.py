@@ -456,8 +456,28 @@ class ApiService:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if "data" in data:
-                        return Ok(str(data["data"]))
+
+                    Logger.info(f"Raw file content response: {type(data)} - {data}")
+
+                    if isinstance(data, dict):
+                        if "data" in data:
+                            content = data["data"]
+                            if isinstance(content, dict):
+                                if "content" in content:
+                                    return Ok(str(content["content"]))
+                                elif "text" in content:
+                                    return Ok(str(content["text"]))
+                                else:
+                                    return Ok(str(content))
+                            else:
+                                return Ok(str(content))
+                        else:
+                            if "content" in data:
+                                return Ok(str(data["content"]))
+                            elif "text" in data:
+                                return Ok(str(data["text"]))
+                            else:
+                                return Ok(str(data))
                     else:
                         return Ok(str(data))
                 else:
