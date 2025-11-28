@@ -2,14 +2,7 @@ from fastapi import (
     APIRouter,
     HTTPException,
     Request,
-    UploadFile,
-    File as FastAPIFile,
-    Form,
-    Depends,
 )
-from fastapi.responses import StreamingResponse
-from typing import List, Optional
-import json
 from datetime import datetime
 
 from fastbot.decorators import inject
@@ -19,10 +12,11 @@ from services import (
     FileService,
     ApiService,
     ContainerService,
-    TextService,
     AgentService,
 )
-from models import User, Container as ContainerModel, File as FileModel
+from models import User
+
+from pampy import match, _
 
 http_router = APIRouter()
 
@@ -593,6 +587,7 @@ async def chat_with_bot(
     container_service: ContainerService,
     auth_service: AuthService,
     agent_service: AgentService,
+    deepseek_agent_service: AgentService,
 ):
     token = None
     auth_header = req.headers.get("Authorization")
@@ -616,6 +611,7 @@ async def chat_with_bot(
     query = request.get("query", "").strip()
     container_id = request.get("container_id")
     conversation_history = request.get("conversation_history", [])
+    model = request.get("model", 0)
     limit = request.get("limit", 5)
 
     if not query:
@@ -697,13 +693,14 @@ async def chat_with_bot(
 
     context = "\n".join(context_parts) if context_parts else "No relevant files found."
 
-    # Logger.info(f"Final context for AI: {context}")
-
-    chat_result = await agent_service.chat(
-        message=query,
-        conversation_history=conversation_history,
-        user=current_user,
-        system_prompt=f"""You are an AI assistant that helps users analyze their files. 
+    chat_result = match(
+        model,
+        0,
+        await agent_service.chat(
+            message=query,
+            conversation_history=conversation_history,
+            user=current_user,
+            system_prompt=f"""You are an AI assistant that helps users analyze their files. 
         
 Context from files:
 {context}
@@ -711,6 +708,21 @@ Context from files:
 User question: {query}
 
 Analyze the file contents and provide a helpful response. If the files don't contain relevant information, explain this politely and suggest what the user can do next.""",
+        ),
+        1,
+        await deepseek_agent_service.chat(
+            message=query,
+            conversation_history=conversation_history,
+            user=current_user,
+            system_prompt=f"""You are an AI assistant that helps users analyze their files. 
+        
+Context from files:
+{context}
+
+User question: {query}
+
+Analyze the file contents and provide a helpful response. If the files don't contain relevant information, explain this politely and suggest what the user can do next.""",
+        ),
     )
 
     if chat_result.is_err():
