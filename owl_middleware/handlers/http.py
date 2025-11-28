@@ -694,6 +694,15 @@ async def chat_with_bot(
 
     context = "\n".join(context_parts) if context_parts else "No relevant files found."
 
+    system_prompt = f"""You are an AI assistant that helps users analyze their files. 
+
+    Context from files:
+    {context}
+
+    User question: {query}
+
+    Analyze the file contents and provide a helpful response. If the files don't contain relevant information, explain this politely and suggest what the user can do next."""
+
     chat_result = match(
         model,
         0,
@@ -701,32 +710,19 @@ async def chat_with_bot(
             message=query,
             conversation_history=conversation_history,
             user=current_user,
-            system_prompt=f"""You are an AI assistant that helps users analyze their files. 
-        
-Context from files:
-{context}
-
-User question: {query}
-
-Analyze the file contents and provide a helpful response. If the files don't contain relevant information, explain this politely and suggest what the user can do next.""",
+            system_prompt=system_prompt,
         ),
         1,
         await deepseek_agent_service.chat(
             message=query,
             conversation_history=conversation_history,
             user=current_user,
-            system_prompt=f"""You are an AI assistant that helps users analyze their files. 
-        
-Context from files:
-{context}
-
-User question: {query}
-
-Analyze the file contents and provide a helpful response. If the files don't contain relevant information, explain this politely and suggest what the user can do next.""",
+            system_prompt=system_prompt,
         ),
     )
 
     if chat_result.is_err():
+        Logger.error(chat_result.unwrap_err())
         raise HTTPException(
             status_code=500, detail=f"Chat error: {chat_result.unwrap_err()}"
         )

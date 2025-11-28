@@ -71,15 +71,17 @@ async def main() -> None:
     )
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     agent_service = services.AgentService(
-        getenv("MISTRAL_API_KEY"),
-        "owl_middleware/templates/prompts",
+        api_key=getenv("MISTRAL_API_KEY"),
+        prompts_dir="owl_middleware/templates/prompts",
+        base_url=None,
         provider="mistral",
     )
 
     deepseek_agent_service = services.AgentService(
-        getenv("DEEPSEEK_API_KEY"),
-        "owl_middleware/templates/prompts",
+        api_key=getenv("DEEPSEEK_API_KEY"),
+        prompts_dir="owl_middleware/templates/prompts",
         default_model="deepseek-chat",
+        base_url=getenv("DEEPSEEK_BASE_URL"),
         provider="deepseek",
     )
     ocr_service = services.Ocr(getenv("NOVITA_API_KEY"))

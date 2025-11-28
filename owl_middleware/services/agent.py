@@ -20,6 +20,7 @@ class AgentService:
     def __init__(
         self,
         api_key: str,
+        base_url: str = None,
         prompts_dir: str = "prompts",
         default_model: str = "mistral-large-latest",
         default_temperature: float = 0.7,
@@ -27,6 +28,7 @@ class AgentService:
     ):
         self._api_key = api_key
         self._model_name = default_model
+        self._base_url = base_url
         self._temperature = default_temperature
         self._prompts_dir = prompts_dir
         self._provider = provider.lower()
@@ -86,22 +88,19 @@ class AgentService:
             model_config = {
                 "model_name": self._model_name,
                 "api_key": self._api_key,
+                "base_url": self._base_url,
                 "temperature": self._temperature,
             }
 
             self._llm_model = match(
                 self._provider,
                 "mistral",
-                lambda: MistralModel(model_config),
+                lambda x: MistralModel(model_config),
                 "deepseek",
-                lambda: DeepSeekModel(model_config),
+                lambda x: DeepSeekModel(model_config),
                 _,
-                lambda: Err(f"Неподдерживаемый провайдер: {self._provider}"),
+                lambda x: Err(f"Неподдерживаемый провайдер: {self._provider}"),
             )
-
-            # Если вернулась ошибка из match
-            if isinstance(self._llm_model, Err):
-                return self._llm_model
 
             self._initialized = True
             return Ok(True)
