@@ -71,7 +71,16 @@ async def main() -> None:
     )
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     agent_service = services.AgentService(
-        getenv("MISTRAL_API_KEY"), "owl_middleware/templates/prompts"
+        getenv("MISTRAL_API_KEY"),
+        "owl_middleware/templates/prompts",
+        provider="mistral",
+    )
+
+    deepseek_agent_service = services.AgentService(
+        getenv("DEEPSEEK_API_KEY"),
+        "owl_middleware/templates/prompts",
+        default_model="deepseek-chat",
+        provider="deepseek",
     )
     ocr_service = services.Ocr(getenv("NOVITA_API_KEY"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
@@ -95,6 +104,7 @@ async def main() -> None:
     bot_builder.add_dependency("container_service", container_service)
     bot_builder.add_dependency("text_service", text_service)
     bot_builder.add_dependency("agent_service", agent_service)
+    bot_builder.add_dependency("deepseek_agent_service", deepseek_agent_service)
     bot_builder.add_dependency("ocr_service", ocr_service)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
@@ -178,6 +188,7 @@ async def main() -> None:
     bot.app.state.container_service = container_service
     bot.app.state.text_service = text_service
     bot.app.state.agent_service = agent_service
+    bot.app.state.deepseek_agent_service = deepseek_agent_service
     bot.app.state.user_resolver = resolvers.resolve_user
 
     use_webhook = getenv("USE_WEBHOOK", "").lower() == "true"

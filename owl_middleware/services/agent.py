@@ -1,13 +1,19 @@
 import asyncio
-import json
-import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 
 from models import User
 from fastbot.core import Result, result_try, Err, Ok
 
-from agentics import PromptEngine, MistralModel, PromptFactory, BasePrompt
+from agentics import (
+    PromptEngine,
+    MistralModel,
+    PromptFactory,
+    BasePrompt,
+    DeepSeekModel,
+)
+
+from pampy import match, _
 
 
 class AgentService:
@@ -17,14 +23,16 @@ class AgentService:
         prompts_dir: str = "prompts",
         default_model: str = "mistral-large-latest",
         default_temperature: float = 0.7,
+        provider: str = "mistral",
     ):
         self._api_key = api_key
         self._model_name = default_model
         self._temperature = default_temperature
         self._prompts_dir = prompts_dir
+        self._provider = provider.lower()
 
         self._prompt_engine: Optional[PromptEngine] = None
-        self._llm_model: Optional[MistralModel] = None
+        self._llm_model: Optional[Union[MistralModel, DeepSeekModel]] = None
         self._initialized = False
 
         self._prompt_cache: Dict[str, BasePrompt] = {}
@@ -57,6 +65,15 @@ class AgentService:
         if self._llm_model:
             self._llm_model.config.temperature = self._temperature
 
+    @property
+    def provider(self) -> str:
+        return self._provider
+
+    @provider.setter
+    def provider(self, value: str):
+        self._provider = value.lower()
+        self._initialized = False
+
     async def initialize(self) -> Result[bool, str]:
         try:
             if not self._api_key:
@@ -71,7 +88,20 @@ class AgentService:
                 "api_key": self._api_key,
                 "temperature": self._temperature,
             }
-            self._llm_model = MistralModel(model_config)
+
+            self._llm_model = match(
+                self._provider,
+                "mistral",
+                lambda: MistralModel(model_config),
+                "deepseek",
+                lambda: DeepSeekModel(model_config),
+                _,
+                lambda: Err(f"Неподдерживаемый провайдер: {self._provider}"),
+            )
+
+            # Если вернулась ошибка из match
+            if isinstance(self._llm_model, Err):
+                return self._llm_model
 
             self._initialized = True
             return Ok(True)
@@ -112,6 +142,7 @@ class AgentService:
                 {
                     "content": response.content,
                     "model": response.model_name,
+                    "provider": self._provider,
                     "prompt_type": prompt_type,
                     "finish_reason": response.finish_reason,
                     "user_id": user.id if user else None,
@@ -281,6 +312,7 @@ class AgentService:
                 "status": "healthy" if test_result.is_ok() else "degraded",
                 "initialized": self._initialized,
                 "model": self._model_name,
+                "provider": self._provider,
                 "prompts_available": (
                     len((await self.get_available_prompts()).unwrap())
                     if test_result.is_ok()
