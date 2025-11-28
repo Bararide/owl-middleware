@@ -580,6 +580,7 @@ async def create_container(
 @inject("container_service")
 @inject("auth_service")
 @inject("agent_service")
+@inject("deepseek_agent_service")
 async def chat_with_bot(
     request: dict,
     req: Request,
