@@ -13,6 +13,7 @@ from services import (
     ApiService,
     ContainerService,
     AgentService,
+    Ocr,
 )
 from models import User
 
@@ -573,6 +574,43 @@ async def create_container(
             }
         ]
     }
+
+
+@http_router.post("/ocr/process")
+@inject("api_service")
+@inject("container_service")
+@inject("auth_service")
+@inject("agent_service")
+@inject("deepseek_agent_service")
+@inject("ocr_service")
+async def ocr_with_bot(
+    request: dict,
+    req: Request,
+    api_service: ApiService,
+    container_service: ContainerService,
+    auth_service: AuthService,
+    agent_service: AgentService,
+    deepseek_agent_service: AgentService,
+    ocr_service: Ocr,
+):
+    token = None
+    auth_header = req.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = req.query_params.get("token")
+        Logger.error(f"Query token: {req.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
 
 
 @http_router.post("/chat")
