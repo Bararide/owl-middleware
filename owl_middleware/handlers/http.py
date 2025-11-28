@@ -1,3 +1,4 @@
+import base64
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -580,37 +581,133 @@ async def create_container(
 @inject("api_service")
 @inject("container_service")
 @inject("auth_service")
-@inject("agent_service")
-@inject("deepseek_agent_service")
 @inject("ocr_service")
-async def ocr_with_bot(
-    request: dict,
-    req: Request,
+async def process_ocr(
+    request: Request,
     api_service: ApiService,
     container_service: ContainerService,
     auth_service: AuthService,
-    agent_service: AgentService,
-    deepseek_agent_service: AgentService,
     ocr_service: Ocr,
 ):
-    token = None
-    auth_header = req.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = req.query_params.get("token")
-        Logger.error(f"Query token: {req.query_params.get('token')}")
+    try:
+        token = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = request.query_params.get("token")
 
-    if not token:
-        Logger.error("No token provided")
-        raise HTTPException(status_code=401, detail="Token required")
+        if not token:
+            Logger.error("No token provided for OCR")
+            raise HTTPException(status_code=401, detail="Token required")
 
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        user_result = await auth_service.get_user_by_token(token)
+        if user_result.is_err():
+            Logger.error(f"Invalid token for OCR: {user_result.unwrap_err()}")
+            raise HTTPException(status_code=401, detail="Invalid token")
 
-    current_user = user_result.unwrap()
+        current_user = user_result.unwrap()
+
+        form = await request.form()
+        container_id = form.get("container_id")
+        file = form.get("file")
+
+        if not container_id:
+            raise HTTPException(status_code=400, detail="Container ID is required")
+
+        if not file or not hasattr(file, "file"):
+            raise HTTPException(status_code=400, detail="File is required")
+
+        container_result = await container_service.get_container(container_id)
+        if container_result.is_err() or not container_result.unwrap():
+            raise HTTPException(status_code=404, detail="Container not found")
+
+        container = container_result.unwrap()
+        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        file_data = await file.read()
+        filename = file.filename
+
+        Logger.info(
+            f"OCR processing for user {current_user.tg_id}, file: {filename}, size: {len(file_data)} bytes"
+        )
+
+        ocr_result = await ocr_service.extract_from_bytes(file_data, filename)
+
+        if ocr_result.is_err():
+            error = ocr_result.unwrap_err()
+            Logger.error(f"OCR processing failed: {error}")
+            raise HTTPException(
+                status_code=500, detail=f"OCR processing failed: {str(error)}"
+            )
+
+        extracted_text = ocr_result.unwrap()
+        Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
+
+        cleaned_text = ocr_service.clean_html_tags(extracted_text)
+        Logger.info(f"After cleaning: {len(cleaned_text)} characters")
+
+        visualized_data = None
+        boxes_count = 0
+
+        if filename.lower().endswith(
+            (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff")
+        ):
+            try:
+                visualized_data = ocr_service.draw_bounding_boxes(
+                    file_data, extracted_text
+                )
+                boxes = ocr_service.parse_bounding_boxes(extracted_text)
+                boxes_count = len(boxes)
+                Logger.info(
+                    f"Generated visualization with {boxes_count} bounding boxes"
+                )
+            except Exception as e:
+                Logger.warning(f"Could not generate visualization: {e}")
+                visualized_data = None
+
+        file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename.split('.')[0]}.txt"
+
+        api_result = await api_service.create_file(
+            path=file_name,
+            content=cleaned_text,
+            user_id=str(current_user.id),
+            container_id=container_id,
+        )
+
+        if api_result.is_err():
+            Logger.error(
+                f"Failed to save OCR result to container: {api_result.unwrap_err()}"
+            )
+
+        response_data = {
+            "text": cleaned_text,
+            "confidence": 0.95,
+            "processing_time": 0,
+            "file_name": filename,
+            "extracted_text_length": len(cleaned_text),
+            "boxes_count": boxes_count,
+            "has_visualization": visualized_data is not None,
+        }
+
+        if visualized_data:
+            response_data["visualization"] = base64.b64encode(visualized_data).decode(
+                "utf-8"
+            )
+            response_data["visualization_format"] = "image/jpeg"
+
+        Logger.info(
+            f"OCR processing completed successfully for user {current_user.tg_id}"
+        )
+
+        return {"data": response_data}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        Logger.error(f"Unexpected error in OCR processing: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @http_router.post("/chat")
