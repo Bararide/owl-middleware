@@ -576,7 +576,9 @@ async def handle_search(
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
-@with_auto_reply("commands/process_photo.j2")
+@with_auto_reply(
+    "commands/process_photo.j2", buttons_template="buttons/ocr_result_validate.j2"
+)
 async def handle_process_photo(
     message: Message,
     user: User,
