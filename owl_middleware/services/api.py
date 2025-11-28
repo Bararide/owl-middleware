@@ -457,7 +457,7 @@ class ApiService:
                 if response.status == 200:
                     data = await response.json()
 
-                    Logger.info(f"Raw file content response: {type(data)} - {data}")
+                    # Logger.info(f"Raw file content response: {type(data)} - {data}")
 
                     if isinstance(data, dict):
                         if "data" in data:
