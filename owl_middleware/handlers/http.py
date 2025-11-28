@@ -583,19 +583,20 @@ async def create_container(
 @inject("auth_service")
 @inject("ocr_service")
 async def process_ocr(
-    request: Request,
+    request: dict,
     api_service: ApiService,
     container_service: ContainerService,
     auth_service: AuthService,
     ocr_service: Ocr,
+    req: Request,
 ):
     try:
         token = None
-        auth_header = request.headers.get("Authorization")
+        auth_header = req.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header[7:]
         else:
-            token = request.query_params.get("token")
+            token = req.query_params.get("token")
 
         if not token:
             Logger.error("No token provided for OCR")
@@ -607,33 +608,69 @@ async def process_ocr(
             raise HTTPException(status_code=401, detail="Invalid token")
 
         current_user = user_result.unwrap()
+        Logger.info(f"OCR request from user: {current_user.tg_id}")
 
-        form = await request.form()
-        container_id = form.get("container_id")
-        file = form.get("file")
+        container_id = request.get("container_id")
+        file_data_base64 = request.get("file_data")
+        file_name = request.get("file_name")
+        mime_type = request.get("mime_type", "image/jpeg")
+
+        Logger.info(f"Container ID: {container_id}")
+        Logger.info(f"File name: {file_name}")
+        Logger.info(f"MIME type: {mime_type}")
+        Logger.info(
+            f"File data length: {len(file_data_base64) if file_data_base64 else 0}"
+        )
 
         if not container_id:
+            Logger.error("Container ID is missing")
             raise HTTPException(status_code=400, detail="Container ID is required")
 
-        if not file or not hasattr(file, "file"):
-            raise HTTPException(status_code=400, detail="File is required")
+        if not file_data_base64:
+            Logger.error("File data is missing")
+            raise HTTPException(status_code=400, detail="File data is required")
+
+        if not file_name:
+            Logger.error("File name is missing")
+            raise HTTPException(status_code=400, detail="File name is required")
 
         container_result = await container_service.get_container(container_id)
         if container_result.is_err() or not container_result.unwrap():
+            Logger.error(f"Container not found: {container_id}")
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
         if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+            Logger.error(
+                f"Access denied for user {current_user.tg_id} to container {container_id}"
+            )
             raise HTTPException(status_code=403, detail="Access denied")
 
-        file_data = await file.read()
-        filename = file.filename
+        try:
+            file_data = base64.b64decode(file_data_base64)
+        except Exception as e:
+            Logger.error(f"Failed to decode base64 file data: {e}")
+            raise HTTPException(status_code=400, detail="Invalid file data encoding")
+
+        Logger.info(f"File decoded: {file_name}, size: {len(file_data)} bytes")
+
+        if len(file_data) == 0:
+            Logger.error("Empty file received")
+            raise HTTPException(status_code=400, detail="Empty file")
+
+        supported_formats = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".pdf"]
+        if not any(file_name.lower().endswith(ext) for ext in supported_formats):
+            Logger.error(f"Unsupported file format: {file_name}")
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file format. Only images and PDF are supported",
+            )
 
         Logger.info(
-            f"OCR processing for user {current_user.tg_id}, file: {filename}, size: {len(file_data)} bytes"
+            f"OCR processing for user {current_user.tg_id}, file: {file_name}, size: {len(file_data)} bytes"
         )
 
-        ocr_result = await ocr_service.extract_from_bytes(file_data, filename)
+        ocr_result = await ocr_service.extract_from_bytes(file_data, file_name)
 
         if ocr_result.is_err():
             error = ocr_result.unwrap_err()
@@ -651,7 +688,7 @@ async def process_ocr(
         visualized_data = None
         boxes_count = 0
 
-        if filename.lower().endswith(
+        if file_name.lower().endswith(
             (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff")
         ):
             try:
@@ -667,10 +704,10 @@ async def process_ocr(
                 Logger.warning(f"Could not generate visualization: {e}")
                 visualized_data = None
 
-        file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename.split('.')[0]}.txt"
+        result_file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name.split('.')[0]}.txt"
 
         api_result = await api_service.create_file(
-            path=file_name,
+            path=result_file_name,
             content=cleaned_text,
             user_id=str(current_user.id),
             container_id=container_id,
@@ -685,7 +722,7 @@ async def process_ocr(
             "text": cleaned_text,
             "confidence": 0.95,
             "processing_time": 0,
-            "file_name": filename,
+            "file_name": file_name,
             "extracted_text_length": len(cleaned_text),
             "boxes_count": boxes_count,
             "has_visualization": visualized_data is not None,
@@ -707,6 +744,9 @@ async def process_ocr(
         raise
     except Exception as e:
         Logger.error(f"Unexpected error in OCR processing: {e}")
+        import traceback
+
+        Logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 

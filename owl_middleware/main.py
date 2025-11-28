@@ -191,6 +191,7 @@ async def main() -> None:
     bot.app.state.text_service = text_service
     bot.app.state.agent_service = agent_service
     bot.app.state.deepseek_agent_service = deepseek_agent_service
+    bot.app.state.ocr_service = ocr_service
     bot.app.state.user_resolver = resolvers.resolve_user
 
     use_webhook = getenv("USE_WEBHOOK", "").lower() == "true"
