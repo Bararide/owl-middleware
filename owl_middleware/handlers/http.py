@@ -630,20 +630,6 @@ async def chat_with_bot(
 
     container = container_result.unwrap()
 
-    # base_theme_of_query = await agent_service.generate_response(
-    #     prompt_type="base_theme.j2",
-    #     context={"message": query},
-    # )
-
-    # if base_theme_of_query.is_err():
-    #     Logger.error(f"Error generating base theme: {base_theme_of_query.unwrap_err()}")
-    #     base_theme = query
-    # else:
-    #     base_theme_data = base_theme_of_query.unwrap()
-    # base_theme = base_theme_data.get("content", query).strip()
-
-    # Logger.info(f"Base theme for search: {base_theme}")
-
     search_result = await api_service.semantic_search(
         query,
         current_user,
@@ -657,7 +643,6 @@ async def chat_with_bot(
         )
 
     search_data = search_result.unwrap()
-    # Logger.info(f"Semantic search response: {search_data}")
 
     context_parts = []
     used_files = []
