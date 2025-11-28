@@ -722,10 +722,9 @@ async def chat_with_bot(
     )
 
     if chat_result.is_err():
-        Logger.error(chat_result.unwrap_err())
-        raise HTTPException(
-            status_code=500, detail=f"Chat error: {chat_result.unwrap_err()}"
-        )
+        error_msg = str(chat_result.unwrap_err())
+        Logger.error("Chat error: {}", error_msg)
+        raise HTTPException(status_code=500, detail=f"Chat error: {error_msg}")
 
     chat_response = chat_result.unwrap()
 
