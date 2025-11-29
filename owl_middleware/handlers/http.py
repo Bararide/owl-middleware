@@ -15,6 +15,7 @@ from services import (
     ContainerService,
     AgentService,
     Ocr,
+    TextService,
 )
 from models import User
 
@@ -269,6 +270,37 @@ async def get_file_content(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@http_router.post("/containers/{container_id}/files")
+@inject("container_service")
+@inject("api_service")
+@inject("auth_service")
+async def upload_file_in_container(
+    container_id: str,
+    container_service: ContainerService,
+    api_service: ApiService,
+    auth_service: AuthService,
+    request: Request,
+):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+
 @http_router.delete("/containers/{file_id}/files/{container_id}")
 @inject("container_service")
 @inject("api_service")
@@ -323,11 +355,6 @@ async def check_health(request: Request, api_service: ApiService):
 
     if health_check_result.is_err():
         raise HTTPException(status_code=500, detail="Health check failed")
-
-    health_check = health_check_result.unwrap()
-
-    if not health_check:
-        raise HTTPException(status_code=503, detail="Service unhealthy")
 
     return {"status": "healthy", "success": True}
 
@@ -577,34 +604,236 @@ async def create_container(
     }
 
 
-@http_router.get("/user")
+@http_router.post("/containers/{container_id}/files")
+@inject("container_service")
+@inject("api_service")
 @inject("auth_service")
-async def get_user(request: Request, auth_service: AuthService):
-    token = None
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = request.query_params.get("token")
+@inject("file_service")
+@inject("text_service")
+async def upload_file_in_container(
+    container_id: str,
+    container_service: ContainerService,
+    api_service: ApiService,
+    auth_service: AuthService,
+    file_service: FileService,
+    text_service: TextService,
+    request: Request,
+):
+    try:
+        token = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = request.query_params.get("token")
 
-    if not token:
-        Logger.error("No token provided for OCR")
-        raise HTTPException(status_code=401, detail="Token required")
+        if not token:
+            Logger.error("No token provided for file upload")
+            raise HTTPException(status_code=401, detail="Token required")
 
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        Logger.error(f"Invalid token for OCR: {user_result.unwrap_err()}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        user_result = await auth_service.get_user_by_token(token)
+        if user_result.is_err():
+            Logger.error(f"Invalid token for file upload: {user_result.unwrap_err()}")
+            raise HTTPException(status_code=401, detail="Invalid token")
 
-    current_user = user_result.unwrap()
+        current_user = user_result.unwrap()
+        Logger.info(f"File upload request from user: {current_user.tg_id}")
 
-    return {
-        "id": current_user.id,
-        "name": current_user.username,
-        "email": current_user.email,
-        "avatar": None,
-        "role": current_user.is_admin,
-    }
+        container_result = await container_service.get_container(container_id)
+        if container_result.is_err() or not container_result.unwrap():
+            Logger.error(f"Container not found: {container_id}")
+            raise HTTPException(status_code=404, detail="Container not found")
+
+        container = container_result.unwrap()
+        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+            Logger.error(
+                f"Access denied for user {current_user.tg_id} to container {container_id}"
+            )
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        form = await request.form()
+        file_upload = form.get("file")
+
+        if not file_upload or not hasattr(file_upload, "file"):
+            raise HTTPException(
+                status_code=400, detail="No file provided or invalid file format"
+            )
+
+        file_content = await file_upload.read()
+        file_size = len(file_content)
+
+        max_file_size = getattr(text_service, "max_file_size", 10 * 1024 * 1024)
+
+        if file_size > max_file_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
+            )
+
+        file_name = (
+            file_upload.filename or f"file_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
+        file_id = f"http_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name}"
+
+        file_data = {
+            "id": file_id,
+            "container_id": container_id,
+            "name": file_name,
+            "size": file_size,
+            "user_id": str(current_user.tg_id),
+            "created_at": datetime.now(),
+            "mime_type": getattr(
+                file_upload, "content_type", "application/octet-stream"
+            ),
+        }
+
+        db_result = await file_service.create_file(file_data)
+        if db_result.is_err():
+            error = db_result.unwrap_err()
+            Logger.error(f"Error creating file in DB: {error}")
+            raise HTTPException(status_code=500, detail=f"Database error: {error}")
+
+        file = db_result.unwrap()
+
+        try:
+            mime_type = getattr(file_upload, "content_type", "")
+            Logger.info(
+                f"File info: name={file_name}, size={file_size} bytes, "
+                f"container={container_id}, mime_type={mime_type}"
+            )
+
+            content_to_upload = None
+            is_text_file = False
+
+            if mime_type == "application/pdf":
+                text_result = await text_service.extract_text_from_pdf(
+                    stream=file_content
+                )
+
+                if text_result.is_err():
+                    await file_service.delete_file(file.id)
+                    error = text_result.unwrap_err()
+                    Logger.error(f"Error extracting text from PDF: {error}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Error extracting text from PDF: {str(error)}",
+                    )
+
+                extracted_text = text_result.unwrap()
+                Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
+
+                if not extracted_text.strip():
+                    await file_service.delete_file(file.id)
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Could not extract text from PDF file. The file may be scanned or protected.",
+                    )
+
+                content_to_upload = extracted_text
+                is_text_file = True
+
+            elif mime_type.startswith("text/"):
+                try:
+                    content_to_upload = file_content.decode("utf-8")
+                except UnicodeDecodeError:
+                    try:
+                        content_to_upload = file_content.decode("latin-1")
+                    except UnicodeDecodeError:
+                        content_to_upload = base64.b64encode(file_content).decode(
+                            "ascii"
+                        )
+                        is_text_file = False
+                else:
+                    is_text_file = True
+            else:
+                content_to_upload = base64.b64encode(file_content).decode("ascii")
+                is_text_file = False
+
+            api_result = await api_service.create_file(
+                path=file.id,
+                content=content_to_upload,
+                user_id=str(current_user.id),
+                container_id=container_id,
+            )
+
+            if api_result.is_err():
+                await file_service.delete_file(file.id)
+                error = api_result.unwrap_err()
+                Logger.error(f"Error uploading to C++ service: {error}")
+
+                error_msg = str(error)
+                if "413" in error_msg:
+                    error_msg = (
+                        f"File too large ({file_size} bytes). Try a smaller file."
+                    )
+                elif "mimetype" in error_msg.lower():
+                    error_msg = (
+                        "Storage service communication error. Please try again later."
+                    )
+                elif "null" in error_msg.lower() or "data" in error_msg.lower():
+                    error_msg = "Service returned invalid response. Please try again."
+
+                raise HTTPException(
+                    status_code=500, detail=f"Upload error: {error_msg}"
+                )
+
+            api_response = api_result.unwrap()
+
+            if api_response is None:
+                Logger.warning(
+                    "API service returned null response, but operation may have succeeded"
+                )
+            elif hasattr(api_response, "get"):
+                if "error" in api_response:
+                    await file_service.delete_file(file.id)
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Service error: {api_response['error']}",
+                    )
+            elif hasattr(api_response, "data"):
+                if api_response.data is None:
+                    Logger.warning("API response data is null")
+
+            Logger.info(
+                f"File uploaded successfully: {file_name} to container {container_id} by user {current_user.tg_id}"
+            )
+
+            response_data = {
+                "success": True,
+                "file": {
+                    "id": file.id,
+                    "name": file.name,
+                    "size": file.size,
+                    "mime_type": file.mime_type,
+                    "container_id": file.container_id,
+                    "created_at": (
+                        file.created_at.isoformat() if file.created_at else None
+                    ),
+                    "is_text": is_text_file,
+                },
+                "container_name": container_id,
+            }
+
+            return {"data": response_data}
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            await file_service.delete_file(file.id)
+            Logger.error(f"Error processing file upload: {e}")
+            import traceback
+
+            Logger.error(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        Logger.error(f"Unexpected error in file upload: {e}")
+        import traceback
+
+        Logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @http_router.post("/ocr/process")
@@ -1047,296 +1276,3 @@ async def delete_container(
         raise HTTPException(status_code=500, detail="Error deleting container")
 
     return {"message": "Container deleted successfully"}
-
-
-# @http_router.post("/containers/{container_id}/restart")
-# async def restart_container(
-#     container_id: str, current_user: User = Depends(get_current_user)
-# ):
-#     """Restart container"""
-#     # Implement container restart logic
-#     return {"message": "Container restart initiated"}
-
-
-# @http_router.post("/containers/{container_id}/stop")
-# async def stop_container(
-#     container_id: str, current_user: User = Depends(get_current_user)
-# ):
-#     """Stop container"""
-#     # Implement container stop logic
-#     return {"message": "Container stop initiated"}
-
-
-# # Files endpoints
-# @http_router.get("/containers/{container_id}/files")
-# async def list_files(
-#     container_id: str,
-#     current_user: User = Depends(get_current_user),
-#     file_service: FileService = Depends(lambda: file_service),
-# ):
-#     """Get all files in container"""
-#     # Verify container ownership
-#     container_result = await container_service.get_container(container_id)
-#     if container_result.is_err() or not container_result.unwrap():
-#         raise HTTPException(status_code=404, detail="Container not found")
-
-#     container = container_result.unwrap()
-#     if container.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     files_result = await file_service.get_files_by_container(container_id)
-
-#     if files_result.is_err():
-#         raise HTTPException(status_code=500, detail="Error fetching files")
-
-#     files = files_result.unwrap()
-#     return {
-#         "data": [
-#             {
-#                 "id": file.id,
-#                 "path": file.path,
-#                 "name": file.name,
-#                 "size": file.size,
-#                 "container_id": file.container_id,
-#                 "user_id": file.user_id,
-#                 "created_at": file.created_at.isoformat() if file.created_at else None,
-#                 "mime_type": file.mime_type,
-#             }
-#             for file in files
-#         ]
-#     }
-
-
-# @http_router.post("/containers/{container_id}/files")
-# async def upload_file(
-#     container_id: str,
-#     file: str = Form(...),
-#     content: str = Form(...),
-#     current_user: User = Depends(get_current_user),
-#     file_service: FileService = Depends(lambda: file_service),
-#     api_service: ApiService = Depends(lambda: api_service),
-#     text_service: TextService = Depends(lambda: text_service),
-# ):
-#     """Upload file to container"""
-#     # Verify container ownership
-#     container_result = await container_service.get_container(container_id)
-#     if container_result.is_err() or not container_result.unwrap():
-#         raise HTTPException(status_code=404, detail="Container not found")
-
-#     container = container_result.unwrap()
-#     if container.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     file_data = json.loads(file)
-
-#     # Create file record in database
-#     db_result = await file_service.create_file(
-#         {
-#             "id": file_data["id"],
-#             "container_id": container_id,
-#             "name": file_data["name"],
-#             "size": file_data["size"],
-#             "user_id": str(current_user.id),
-#             "created_at": datetime.now(),
-#             "mime_type": file_data.get("mime_type", "application/octet-stream"),
-#         }
-#     )
-
-#     if db_result.is_err():
-#         raise HTTPException(
-#             status_code=500, detail=f"Database error: {db_result.unwrap_err()}"
-#         )
-
-#     file_obj = db_result.unwrap()
-
-#     # Upload to C++ service
-#     api_result = await api_service.create_file(
-#         path=file_obj.id,
-#         content=content,
-#         user_id=str(current_user.id),
-#         container_id=container_id,
-#     )
-
-#     if api_result.is_err():
-#         # Rollback database creation
-#         await file_service.delete_file(file_obj.id)
-#         raise HTTPException(
-#             status_code=500, detail=f"Service error: {api_result.unwrap_err()}"
-#         )
-
-#     return {
-#         "data": {
-#             "id": file_obj.id,
-#             "path": file_obj.path,
-#             "name": file_obj.name,
-#             "size": file_obj.size,
-#             "container_id": file_obj.container_id,
-#             "user_id": file_obj.user_id,
-#             "created_at": (
-#                 file_obj.created_at.isoformat() if file_obj.created_at else None
-#             ),
-#             "mime_type": file_obj.mime_type,
-#         }
-#     }
-
-
-# @http_router.get("/containers/{container_id}/files/{file_id}/content")
-# async def read_file_content(
-#     container_id: str,
-#     file_id: str,
-#     current_user: User = Depends(get_current_user),
-#     api_service: ApiService = Depends(lambda: api_service),
-# ):
-#     """Read file content"""
-#     # Verify container and file ownership
-#     container_result = await container_service.get_container(container_id)
-#     if container_result.is_err() or not container_result.unwrap():
-#         raise HTTPException(status_code=404, detail="Container not found")
-
-#     container = container_result.unwrap()
-#     if container.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     content_result = await api_service.get_file_content(file_id, container_id)
-
-#     if content_result.is_err():
-#         raise HTTPException(
-#             status_code=500, detail=f"Error reading file: {content_result.unwrap_err()}"
-#         )
-
-#     return {"data": {"content": content_result.unwrap()}}
-
-
-# @http_router.get("/containers/{container_id}/files/{file_id}/download")
-# async def download_file(
-#     container_id: str,
-#     file_id: str,
-#     current_user: User = Depends(get_current_user),
-#     api_service: ApiService = Depends(lambda: api_service),
-# ):
-#     """Download file"""
-#     # Verify container and file ownership
-#     container_result = await container_service.get_container(container_id)
-#     if container_result.is_err() or not container_result.unwrap():
-#         raise HTTPException(status_code=404, detail="Container not found")
-
-#     container = container_result.unwrap()
-#     if container.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     content_result = await api_service.get_file_content(file_id, container_id)
-
-#     if content_result.is_err():
-#         raise HTTPException(
-#             status_code=500, detail=f"Error reading file: {content_result.unwrap_err()}"
-#         )
-
-#     content = content_result.unwrap()
-
-#     # Determine filename and content type
-#     file_result = await file_service.get_file(file_id)
-#     if file_result.is_ok() and file_result.unwrap():
-#         file_obj = file_result.unwrap()
-#         filename = file_obj.name or f"file_{file_id}"
-#         mime_type = file_obj.mime_type or "application/octet-stream"
-#     else:
-#         filename = f"file_{file_id}"
-#         mime_type = "application/octet-stream"
-
-#     # Return as downloadable file
-#     return StreamingResponse(
-#         iter([content.encode("utf-8")]),
-#         media_type=mime_type,
-#         headers={"Content-Disposition": f"attachment; filename={filename}"},
-#     )
-
-
-# @http_router.delete("/containers/{container_id}/files/{file_id}")
-# async def delete_file(
-#     container_id: str,
-#     file_id: str,
-#     current_user: User = Depends(get_current_user),
-#     file_service: FileService = Depends(lambda: file_service),
-# ):
-#     """Delete file"""
-#     # Verify container and file ownership
-#     container_result = await container_service.get_container(container_id)
-#     if container_result.is_err() or not container_result.unwrap():
-#         raise HTTPException(status_code=404, detail="Container not found")
-
-#     container = container_result.unwrap()
-#     if container.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     file_result = await file_service.get_file(file_id)
-#     if file_result.is_err() or not file_result.unwrap():
-#         raise HTTPException(status_code=404, detail="File not found")
-
-#     file_obj = file_result.unwrap()
-#     if file_obj.user_id != str(current_user.id) and not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Access denied")
-
-#     delete_result = await file_service.delete_file(file_id)
-
-#     if delete_result.is_err():
-#         raise HTTPException(status_code=500, detail="Error deleting file")
-
-#     return {"message": "File deleted successfully"}
-
-
-# Search endpoints
-
-
-# @http_router.post("/search/rebuild-index")
-# async def rebuild_index(
-#     current_user: User = Depends(get_current_user),
-#     api_service: ApiService = Depends(lambda: api_service),
-# ):
-#     """Rebuild search index (admin only)"""
-#     if not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Insufficient permissions")
-
-#     rebuild_result = await api_service.rebuild_index()
-
-#     if rebuild_result.is_err():
-#         raise HTTPException(
-#             status_code=500, detail=f"Rebuild error: {rebuild_result.unwrap_err()}"
-#         )
-
-#     return {"data": rebuild_result.unwrap()}
-
-
-# @http_router.get("/health")
-# @inject("api_service")
-# async def health_check(api_service: ApiService):
-#     """Health check"""
-#     health_result = await api_service.health_check()
-
-#     if health_result.is_err():
-#         return {"data": {"status": "offline", "error": str(health_result.unwrap_err())}}
-
-#     is_healthy = health_result.unwrap()
-#     return {"data": {"status": "online" if is_healthy else "offline"}}
-
-
-# @http_router.get("/system/status")
-# async def system_status(
-#     current_user: User = Depends(get_current_user),
-#     api_service: ApiService = Depends(lambda: api_service),
-# ):
-#     if not current_user.is_admin:
-#         raise HTTPException(status_code=403, detail="Insufficient permissions")
-
-#     health_result = await api_service.health_check()
-#     root_result = await api_service.get_root()
-
-#     status_data = {
-#         "service_status": (
-#             "online" if health_result.is_ok() and health_result.unwrap() else "offline"
-#         ),
-#     }
-
-#     if root_result.is_ok():
-#         status_data["root_message"] = root_result.unwrap().get("message", "No message")
-
-#     return {"data": status_data}
