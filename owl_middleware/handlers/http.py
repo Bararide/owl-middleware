@@ -270,35 +270,218 @@ async def get_file_content(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+from fastapi import UploadFile, File, Form
+import os
+
+
 @http_router.post("/containers/{container_id}/files")
 @inject("container_service")
 @inject("api_service")
 @inject("auth_service")
+@inject("file_service")
+@inject("text_service")
 async def upload_file_in_container(
     container_id: str,
     container_service: ContainerService,
     api_service: ApiService,
     auth_service: AuthService,
+    file_service: FileService,
+    text_service: TextService,
     request: Request,
+    file: UploadFile = File(...),  # Явно указываем UploadFile с увеличенным лимитом
 ):
-    token = None
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = request.query_params.get("token")
-        Logger.error(f"Query token: {request.query_params.get('token')}")
+    try:
+        token = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = request.query_params.get("token")
 
-    if not token:
-        Logger.error("No token provided")
-        raise HTTPException(status_code=401, detail="Token required")
+        if not token:
+            Logger.error("No token provided for file upload")
+            raise HTTPException(status_code=401, detail="Token required")
 
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        user_result = await auth_service.get_user_by_token(token)
+        if user_result.is_err():
+            Logger.error(f"Invalid token for file upload: {user_result.unwrap_err()}")
+            raise HTTPException(status_code=401, detail="Invalid token")
 
-    current_user = user_result.unwrap()
+        current_user = user_result.unwrap()
+        Logger.info(f"File upload request from user: {current_user.tg_id}")
+
+        container_result = await container_service.get_container(container_id)
+        if container_result.is_err():
+            Logger.error(f"Error getting container: {container_result.unwrap_err()}")
+            raise HTTPException(status_code=500, detail="Error accessing container")
+
+        container = container_result.unwrap()
+        if not container:
+            Logger.error(f"Container not found: {container_id}")
+            raise HTTPException(status_code=404, detail="Container not found")
+
+        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+            Logger.error(
+                f"Access denied for user {current_user.tg_id} to container {container_id}"
+            )
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Используем переданный файл напрямую
+        file_upload = file
+        file_content = await file_upload.read()
+        file_size = len(file_content)
+
+        # Проверяем лимит контейнера
+        limits_result = await container_service.check_container_limits(container_id)
+        if limits_result.is_ok():
+            limits = limits_result.unwrap()
+            storage_used = limits["storage"]["used"]
+            storage_limit = limits["storage"]["limit"]
+
+            if storage_used + file_size > storage_limit:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Storage quota exceeded. Available: {storage_limit - storage_used} bytes, file size: {file_size} bytes",
+                )
+
+        # Проверяем максимальный размер файла (10MB как в TG)
+        max_file_size = 10 * 1024 * 1024  # 10MB
+        if file_size > max_file_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
+            )
+
+        file_name = (
+            file_upload.filename or f"file_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
+
+        file_data = {
+            "id": f"http_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name}",
+            "container_id": container_id,
+            "name": file_name,
+            "size": file_size,
+            "user_id": str(current_user.tg_id),
+            "created_at": datetime.now(),
+            "mime_type": file_upload.content_type or "application/octet-stream",
+        }
+
+        db_result = await file_service.create_file(file_data)
+        if db_result.is_err():
+            error = db_result.unwrap_err()
+            Logger.error(f"Error creating file in DB: {error}")
+            raise HTTPException(status_code=500, detail=f"Database error: {error}")
+
+        file_entity = db_result.unwrap()
+
+        try:
+            binary_content = file_content
+            mime_type = file_upload.content_type or ""
+
+            Logger.info(
+                f"File info: name={file_entity.name}, size={len(binary_content)} bytes, container={container.id}, mime_type={mime_type}"
+            )
+
+            if mime_type == "application/pdf":
+                text_result = await text_service.extract_text_from_pdf(
+                    stream=binary_content
+                )
+
+                if text_result.is_err():
+                    await file_service.delete_file(file_entity.id)
+                    error = text_result.unwrap_err()
+                    Logger.error(f"Error extracting text from PDF: {error}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Error extracting text from PDF: {str(error)}",
+                    )
+
+                extracted_text = text_result.unwrap()
+                Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
+
+                if not extracted_text.strip():
+                    await file_service.delete_file(file_entity.id)
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Could not extract text from PDF file. The file may be scanned or protected.",
+                    )
+
+                api_result = await api_service.create_file(
+                    path=file_entity.id,
+                    content=extracted_text,
+                    user_id=str(current_user.id),
+                    container_id=container.id,
+                )
+
+            elif mime_type and mime_type.startswith("text/"):
+                content_text = binary_content.decode("utf-8", errors="ignore")
+                api_result = await api_service.create_file(
+                    path=file_entity.id,
+                    content=content_text,
+                    user_id=str(current_user.id),
+                    container_id=container.id,
+                )
+            else:
+                content_base64 = base64.b64encode(binary_content).decode("ascii")
+                api_result = await api_service.create_file(
+                    path=file_entity.id,
+                    content=content_base64,
+                    user_id=str(current_user.id),
+                    container_id=container.id,
+                )
+
+            if api_result.is_err():
+                await file_service.delete_file(file_entity.id)
+                error = api_result.unwrap_err()
+                Logger.error(f"Error uploading to C++ service: {error}")
+
+                error_msg = str(error)
+                if "413" in error_msg:
+                    error_msg = f"File too large ({len(binary_content)} bytes). Try a smaller file."
+                elif "mimetype" in error_msg.lower():
+                    error_msg = (
+                        "Storage service communication error. Please try again later."
+                    )
+
+                raise HTTPException(
+                    status_code=500, detail=f"Upload error: {error_msg}"
+                )
+
+            Logger.info(
+                f"File uploaded successfully: {file_name} to container {container_id} by user {current_user.tg_id}"
+            )
+
+            return {
+                "data": {
+                    "success": True,
+                    "file": {
+                        "id": file_entity.id,
+                        "name": file_entity.name,
+                        "size": file_entity.size,
+                        "mime_type": file_entity.mime_type,
+                        "container_id": file_entity.container_id,
+                        "created_at": (
+                            file_entity.created_at.isoformat()
+                            if file_entity.created_at
+                            else None
+                        ),
+                    },
+                    "container_name": container.id,
+                }
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            await file_service.delete_file(file_entity.id)
+            Logger.error(f"Error processing file upload: {e}")
+            raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        Logger.error(f"Unexpected error in file upload: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @http_router.delete("/containers/{file_id}/files/{container_id}")
