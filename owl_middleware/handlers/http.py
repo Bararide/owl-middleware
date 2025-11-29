@@ -836,6 +836,45 @@ async def upload_file_in_container(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+#  const mockUser: User = {
+#   id: 'user123',
+#   name: 'Алексей Петров',
+#   email: 'alexey@company.com',
+#   role: 'Senior Developer'
+# };
+
+
+@http_router.get("/user")
+@inject("auth_service")
+async def get_user(request: Request, auth_service: AuthService):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+
+    if not token:
+        Logger.error("No token provided for OCR")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token for OCR: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    return {
+        "data": {
+            "id": current_user.id,
+            "name": current_user.username,
+            "email": current_user.email,
+            "role": current_user.is_admin,
+        }
+    }
+
+
 @http_router.post("/ocr/process")
 @inject("api_service")
 @inject("container_service")
