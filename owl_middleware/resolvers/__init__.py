@@ -25,6 +25,8 @@ from .context import (
     file_preview_context,
     get_token_context,
     process_photo_context,
+    registration_choose_context,
+    registration_choose_buttons_context,
 )
 
 __all__ = [
@@ -54,4 +56,6 @@ __all__ = [
     "file_preview_context",
     "get_token_context",
     "process_photo_context",
+    "registration_choose_context",
+    "registration_choose_buttons_context",
 ]

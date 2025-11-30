@@ -14,6 +14,7 @@ from .handlers import (
     handle_select_container,
     handle_get_token,
     handle_process_photo,
+    handle_choose_container,
 )
 
 from .http import http_router
@@ -36,4 +37,5 @@ __all__ = [
     "http_router",
     "handle_get_token",
     "handle_process_photo",
+    "handle_choose_container",
 ]

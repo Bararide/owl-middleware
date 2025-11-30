@@ -13,6 +13,7 @@ from services import (
     ContainerService,
     TextService,
     Ocr,
+    State,
 )
 from fastbot.decorators import (
     with_template_engine,
@@ -198,6 +199,69 @@ async def handle_download_file(
             "context": await cen.get(
                 "download_file",
                 error="Использование: /download_file <file_id> <container_id>\nПример: /download_file file123 dev_env",
+            )
+        }
+
+
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
+@with_auto_reply(
+    "commands/choose_container.j2", buttons_template="buttons/container_menu_buttons.j2"
+)
+async def handle_choose_container(
+    message: Message,
+    user: User,
+    ten: TemplateEngine,
+    container_service: ContainerService,
+    cen: ContextEngine,
+):
+    try:
+        containers_result = await container_service.get_containers_by_user_id(
+            str(user.tg_id)
+        )
+
+        Logger.info(f"{containers_result.unwrap()}")
+
+        if containers_result.is_err():
+            Logger.error(
+                f"Error getting containers for user {user.tg_id}: {containers_result.unwrap_err()}"
+            )
+            return {
+                "context": await cen.get(
+                    "choose_container", error="Ошибка при получении списка контейнеров"
+                )
+            }
+
+        containers = containers_result.unwrap()
+
+        if not containers:
+            return {
+                "context": await cen.get(
+                    "choose_container",
+                    error="У вас нет контейнеров. Сначала создайте контейнер командой /create_container",
+                )
+            }
+
+        container_names = [str(container.id) for container in containers]
+
+        Logger.info(f"{container_names}")
+
+        return (
+            {
+                "context": await cen.get("choose_container"),
+                "buttons_context": await cen.get(
+                    "container_menu_buttons",
+                    container_names=container_names,
+                    containers_count=len(containers),
+                ),
+            },
+        )
+
+    except Exception as e:
+        Logger.error(f"Unexpected error in handle_choose_container: {e}")
+        return {
+            "context": await cen.get(
+                "choose_container", error=f"Неожиданная ошибка: {str(e)}"
             )
         }
 

@@ -1,3 +1,10 @@
 [
-    
+    {% for container_name in container_names %}
+    {"text": "📦 {{ container_name }}", "callback_data": "container_{{ container_name }}"}
+    {% if not loop.last %},{% endif %}
+    {% endfor %}
+    {% if containers_count > 0 %},
+    {"text": "🔄 Обновить список", "callback_data": "refresh_containers"},
+    {"text": "⬅️ Назад", "callback_data": "main_menu"}
+    {% endif %}
 ]

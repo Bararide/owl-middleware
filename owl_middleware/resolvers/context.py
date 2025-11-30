@@ -17,6 +17,18 @@ async def registration_error_context(error: str):
     return {"error": error, "has_access": False, "success": False}
 
 
+@register_context("choose_container")
+async def registration_choose_context(error: str = ""):
+    return {"error": error}
+
+
+@register_context("container_menu_buttons")
+async def registration_choose_buttons_context(
+    container_names: List, containers_count: int
+):
+    return {"container_names": container_names, "containers_count": containers_count}
+
+
 @register_context("registration")
 async def registration_context(user: User, success: bool):
     return {
