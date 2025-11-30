@@ -55,9 +55,9 @@ async def choose_container_filter_context(
             "success": True,
             "container_id": container.id,
             "container_name": container.id,
-            "memory_limit": container.memory_limit,
-            "storage_quota": container.storage_quota,
-            "file_limit": container.file_limit,
+            "memory_limit": container.tariff.memory_limit,
+            "storage_quota": container.tariff.storage_quota,
+            "file_limit": container.tariff.file_limit,
             "message": f"✅ Контейнер {container.id} выбран для работы",
         }
 
