@@ -246,16 +246,15 @@ async def handle_choose_container(
 
         Logger.info(f"{container_names}")
 
-        return (
-            {
-                "context": await cen.get("choose_container"),
-                "buttons_context": await cen.get(
-                    "container_menu_buttons",
-                    container_names=container_names,
-                    containers_count=len(containers),
-                ),
-            },
-        )
+        return {
+            "context": await cen.get("choose_container"),
+            "buttons_context": await cen.get(
+                "container_menu_buttons",
+                container_names=container_names,
+                containers_count=len(containers),
+            ),
+            "row_width": 1,
+        }
 
     except Exception as e:
         Logger.error(f"Unexpected error in handle_choose_container: {e}")

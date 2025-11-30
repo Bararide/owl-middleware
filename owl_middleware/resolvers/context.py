@@ -24,9 +24,12 @@ async def registration_choose_context(error: str = ""):
 
 @register_context("container_menu_buttons")
 async def registration_choose_buttons_context(
-    container_names: List, containers_count: int
+    container_names: list, containers_count: int
 ):
-    return {"container_names": container_names, "containers_count": containers_count}
+    return {
+        "container_names": container_names,
+        "containers_count": containers_count,
+    }
 
 
 @register_context("registration")
