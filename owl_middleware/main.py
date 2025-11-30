@@ -87,6 +87,8 @@ async def main() -> None:
     ocr_service = services.Ocr(getenv("NOVITA_API_KEY"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
 
+    state_service = services.State()
+
     bot_builder = (
         FastBotBuilder()
         .set_bot(Bot(token=getenv("BOT_TOKEN")))
@@ -108,6 +110,7 @@ async def main() -> None:
     bot_builder.add_dependency("agent_service", agent_service)
     bot_builder.add_dependency("deepseek_agent_service", deepseek_agent_service)
     bot_builder.add_dependency("ocr_service", ocr_service)
+    bot_builder.add_dependency("state_service", state_service)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)

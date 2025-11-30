@@ -33,15 +33,6 @@ class State:
         state.work_container_id = None
         state.last_activity = datetime.now()
 
-    def update_metadata(self, user_id: str, key: str, value: Any) -> None:
-        state = self.get_state(user_id)
-        state.metadata[key] = value
-        state.last_activity = datetime.now()
-
-    def get_metadata(self, user_id: str, key: str, default: Any = None) -> Any:
-        state = self.get_state(user_id)
-        return state.metadata.get(key, default)
-
     def cleanup_old_states(self, hours: int = 24) -> None:
         cutoff_time = datetime.now().timestamp() - (hours * 3600)
         to_remove = []

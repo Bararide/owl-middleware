@@ -8,6 +8,8 @@ from .valito import HanaValidator
 from .agent import AgentService
 from .ocr import Ocr
 
+from .state import State
+
 __all__ = [
     "AuthService",
     "DBService",
@@ -18,4 +20,5 @@ __all__ = [
     "HanaValidator",
     "AgentService",
     "Ocr",
+    "State",
 ]
