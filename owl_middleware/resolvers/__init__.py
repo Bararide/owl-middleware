@@ -27,6 +27,7 @@ from .context import (
     process_photo_context,
     registration_choose_context,
     registration_choose_buttons_context,
+    choose_container_filter_context,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "process_photo_context",
     "registration_choose_context",
     "registration_choose_buttons_context",
+    "choose_container_filter_context",
 ]

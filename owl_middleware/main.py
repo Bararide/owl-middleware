@@ -143,6 +143,7 @@ async def main() -> None:
             resolvers.process_photo_context,
             resolvers.registration_choose_context,
             resolvers.registration_choose_buttons_context,
+            resolvers.choose_container_filter_context,
         ]
     )
 
@@ -180,6 +181,10 @@ async def main() -> None:
 
     await bot_builder.add_callback_query_handler(
         filters.handle_create_container_callback, F.data.contains("create_container")
+    )
+
+    await bot_builder.add_callback_query_handler(
+        filters.handle_choose_container_callback, F.data.startswith("container_")
     )
 
     await bot_builder.add_handler(handlers.handle_file_upload, F.document)

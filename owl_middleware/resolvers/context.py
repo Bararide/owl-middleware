@@ -2,6 +2,8 @@ from models import User, File
 from fastbot.decorators import register_context
 from typing import List, Dict, Any
 
+from models import Container
+
 
 @register_context("start")
 async def start_context(user: User):
@@ -39,6 +41,27 @@ async def registration_context(user: User, success: bool):
         "user": user,
         "message": "Регистрация прошла успешно!" if success else "Ошибка регистрации",
     }
+
+
+@register_context("choose_container_filter")
+async def choose_container_filter_context(
+    container: Container = None, error: str = None, success: bool = False
+):
+    if error:
+        return {"error": error, "success": False}
+
+    if success and container:
+        return {
+            "success": True,
+            "container_id": container.id,
+            "container_name": container.id,
+            "memory_limit": container.memory_limit,
+            "storage_quota": container.storage_quota,
+            "file_limit": container.file_limit,
+            "message": f"✅ Контейнер {container.id} выбран для работы",
+        }
+
+    return {"success": False, "error": "Неизвестная ошибка"}
 
 
 @register_context("file_list")
