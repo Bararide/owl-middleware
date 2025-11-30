@@ -135,6 +135,9 @@ class AgentService:
                 prompt = self._get_cached_prompt(prompt_type, **kwargs)
                 prompt_text = prompt.format(**context)
 
+                if isinstance(prompt_text, BasePrompt):
+                    prompt_text = prompt_text.config.template
+
             response = await self._llm_model.generate(prompt_text)
 
             return Ok(
