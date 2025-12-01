@@ -1055,14 +1055,12 @@ async def handle_list_files(
     ten: TemplateEngine,
     file_service: FileService,
     api_service: ApiService,
+    state_service: State,
     container_service: ContainerService,
     cen: ContextEngine,
 ):
-    containers = await container_service.get_containers_by_user_id(user.tg_id)
-    files_result = [
-        await file_service.get_files_by_container(container.id)
-        for container in containers
-    ]
+    container = state_service.get_work_container(str(user.tg_id))
+    files_result = await file_service.get_files_by_container(container)
 
     if files_result.is_err():
         error = files_result.unwrap_err()
@@ -1099,7 +1097,7 @@ async def handle_list_files(
                     "size": "N/A",
                     "db_size": file.size,
                     "created_at": file.created_at,
-                    "error": "Not found in storage",
+                    # "error": "Not found in storage",
                 }
             )
 
