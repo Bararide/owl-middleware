@@ -154,6 +154,10 @@ async def main() -> None:
     )
 
     await bot_builder.add_callback_query_handler(
+        filters.handle_read_file_callback, F.data.startswith("file_")
+    )
+
+    await bot_builder.add_callback_query_handler(
         filters.handle_choose_container_callback, F.data.startswith("container_")
     )
 
