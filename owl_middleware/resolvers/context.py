@@ -258,20 +258,9 @@ async def file_preview_context(
 @register_context("semantic_search")
 async def semantic_search_context(
     query: str = "",
-    results: List[Dict[str, Any]] = None,
-    count: int = 0,
     error: str = "",
 ):
-    if results is None:
-        results = []
-
-    return {
-        "query": query,
-        "results": results,
-        "count": count,
-        "error": error,
-        "has_results": count > 0,
-    }
+    return {"query": query, "error": error}
 
 
 @register_context("read_file")
