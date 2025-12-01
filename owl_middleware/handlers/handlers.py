@@ -431,6 +431,7 @@ async def handle_file_upload(
     api_service: ApiService,
     container_service: ContainerService,
     text_service: TextService,
+    state_service: State,
     cen: ContextEngine,
 ):
     if not message.document:
@@ -460,7 +461,7 @@ async def handle_file_upload(
             )
         }
 
-    container = containers[0]
+    container = state_service.get_work_container(str(user.tg_id))
 
     document = message.document
 
@@ -650,6 +651,7 @@ async def handle_process_photo(
     container_service: ContainerService,
     api_service: ApiService,
     ocr_service: Ocr,
+    state_service: State,
     context_engine: ContextEngine,
 ):
     if not message.photo:
@@ -679,7 +681,7 @@ async def handle_process_photo(
             )
         }
 
-    container = containers[0]
+    container = state_service.get_work_container(user.tg_id)
 
     try:
         photo = message.photo[-1]
