@@ -38,11 +38,10 @@ async def handle_get_token(
     auth_service: AuthService,
     context_engine: ContextEngine,
 ):
-    """Генерирует JWT токен для веб-доступа"""
     try:
         token = auth_service.generate_jwt_token(user)
 
-        web_url = f"http://localhost:8080?token={token}"
+        web_url = f"http://localhost:3001?token={token}"
 
         Logger.info(f"Generated JWT token for user {user.tg_id}")
 
@@ -126,7 +125,7 @@ async def handle_download_file(
             )
         }
 
-    if len(args) >= 2:
+    if len(args) >= 1:
         file_id = args[0]
         container_id = state_service.get_work_container(str(user.id)).id
 
