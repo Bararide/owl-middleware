@@ -115,38 +115,7 @@ async def main() -> None:
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)
 
-    await bot_builder.add_contexts(
-        [
-            resolvers.start_context,
-            resolvers.registration_context,
-            resolvers.file_list_context,
-            resolvers.file_upload_context,
-            resolvers.semantic_search_context,
-            resolvers.service_status_context,
-            resolvers.file_info_context,
-            resolvers.search_result_context,
-            resolvers.api_error_context,
-            resolvers.storage_stats_context,
-            resolvers.registration_error_context,
-            resolvers.delete_file_context,
-            resolvers.read_file_context,
-            resolvers.rebuild_index_context,
-            resolvers.health_check_context,
-            resolvers.list_files_context,
-            resolvers.create_container_context,
-            resolvers.create_container_help_context,
-            resolvers.read_file_impl_context,
-            resolvers.download_selection_context,
-            resolvers.download_file_context,
-            resolvers.file_preview_context,
-            resolvers.get_token_context,
-            resolvers.process_photo_context,
-            resolvers.registration_choose_context,
-            resolvers.registration_choose_buttons_context,
-            resolvers.choose_container_filter_context,
-            resolvers.registration_search_menu_buttons,
-        ]
-    )
+    await bot_builder.add_contexts(resolvers.ALL_CONTEXTS)
 
     command_handlers = [
         ("start", handlers.cmd_start, "Начать взаимодействие с ботом"),
