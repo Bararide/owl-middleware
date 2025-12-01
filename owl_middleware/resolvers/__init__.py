@@ -28,6 +28,7 @@ from .context import (
     registration_choose_context,
     registration_choose_buttons_context,
     choose_container_filter_context,
+    registration_search_menu_buttons,
 )
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "registration_choose_context",
     "registration_choose_buttons_context",
     "choose_container_filter_context",
+    "registration_search_menu_buttons",
 ]

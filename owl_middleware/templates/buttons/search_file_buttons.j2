@@ -1,0 +1,10 @@
+[
+    {% for file_name in file_names %}
+    {"text": "📦 {{ file_name }}", "callback_data": "file_{{ file_name }}"}
+    {% if not loop.last %},{% endif %}
+    {% endfor %}
+    {% if files_count > 0 %},
+    {"text": "🔄 Обновить список", "callback_data": "refresh_files"},
+    {"text": "⬅️ Назад", "callback_data": "main_menu"}
+    {% endif %}
+]

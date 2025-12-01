@@ -590,7 +590,9 @@ async def handle_file_upload(
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
-@with_auto_reply("commands/semantic_search.j2")
+@with_auto_reply(
+    "commands/semantic_search.j2", buttons_template="buttons/search_file_buttons.j2"
+)
 async def handle_search(
     message: Message,
     user: User,

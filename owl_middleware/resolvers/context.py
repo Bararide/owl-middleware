@@ -34,6 +34,11 @@ async def registration_choose_buttons_context(
     }
 
 
+@register_context("search_file_buttons")
+async def registration_search_menu_buttons(file_names: list, files_count: int):
+    return {"file_names": file_names, "files_count": files_count}
+
+
 @register_context("registration")
 async def registration_context(user: User, success: bool):
     return {

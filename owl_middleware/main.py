@@ -144,6 +144,7 @@ async def main() -> None:
             resolvers.registration_choose_context,
             resolvers.registration_choose_buttons_context,
             resolvers.choose_container_filter_context,
+            resolvers.registration_search_menu_buttons,
         ]
     )
 
