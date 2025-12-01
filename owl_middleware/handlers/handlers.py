@@ -1,4 +1,5 @@
 from datetime import datetime
+import html
 from aiogram.enums import ParseMode
 from aiogram.types import Message
 
@@ -75,6 +76,7 @@ async def handle_download_file(
     file_service: FileService,
     api_service: ApiService,
     container_service: ContainerService,
+    state_service: State,
     cen: ContextEngine,
 ):
     args = message.text.split()[1:]
@@ -126,7 +128,7 @@ async def handle_download_file(
 
     if len(args) >= 2:
         file_id = args[0]
-        container_id = args[1]
+        container_id = state_service.get_work_container(str(user.id)).id
 
         Logger.info(f"Downloading file: {file_id} from container: {container_id}")
 
@@ -840,11 +842,9 @@ async def handle_read_file_impl(
     user: User,
     ten: TemplateEngine,
     api_service: ApiService,
+    state_service: State,
     cen: ContextEngine,
 ):
-    import html
-    import base64
-
     args = message.text.split()[1:]
 
     if not args:
@@ -856,7 +856,7 @@ async def handle_read_file_impl(
         }
 
     file_id = args[0]
-    container_id = args[1]
+    container_id = state_service.get_work_container(str(user.tg_id)).id
 
     content_result = await api_service.get_file_content(str(file_id), str(container_id))
 
