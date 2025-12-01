@@ -637,7 +637,13 @@ async def handle_search(
     return {
         "context": await cen.get(
             "semantic_search", query=query, results=results, count=len(results)
-        )
+        ),
+        "buttons_context": await cen.get(
+            "search_file_buttons",
+            file_names=[result.get("path", "Unknown") for result in results],
+            files_count=len(results),
+        ),
+        "row_width": 1,
     }
 
 
