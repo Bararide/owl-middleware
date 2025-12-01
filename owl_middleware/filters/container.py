@@ -1,3 +1,5 @@
+import asyncio
+
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -50,8 +52,22 @@ async def handle_choose_container_callback(
 
         state_service.set_work_container(str(user.tg_id), str(container.id))
 
-        message: types.Message = str(container.id)
-        # await message.reply_to_message.pin(disable_notification=True)
+        context = await cen.get(
+            "choose_container_filter", container=container, success=True
+        )
+
+        await callback.message.edit_text(
+            f"✅ <b>Контейнер выбран:</b> {container.id}\n",
+            parse_mode="HTML",
+        )
+
+        await asyncio.sleep(2)
+
+        try:
+            await callback.message.pin(disable_notification=True)
+        except Exception as pin_error:
+            Logger.warning(f"Не удалось закрепить сообщение: {pin_error}")
+            await callback.message.reply("⚠️ Не удалось закрепить сообщение")
 
         return {
             "context": await cen.get(
