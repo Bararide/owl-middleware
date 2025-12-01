@@ -503,9 +503,9 @@ async def handle_file_upload(
 
         binary_content = file_content.read()
 
-        Logger.info(
-            f"File info: name={file.name}, size={len(binary_content)} bytes, container={container.id}, mime_type={document.mime_type}"
-        )
+        # Logger.info(
+        #     f"File info: name={file.name}, size={len(binary_content)} bytes, container={container.id}, mime_type={document.mime_type}"
+        # )
 
         if document.mime_type == "application/pdf":
             text_result = await text_service.extract_text_from_pdf(
@@ -524,7 +524,7 @@ async def handle_file_upload(
                 }
 
             extracted_text = text_result.unwrap()
-            Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
+            # Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
 
             if not extracted_text.strip():
                 await file_service.delete_file(file.id)
@@ -707,13 +707,13 @@ async def handle_process_photo(
 
     try:
         photo = message.photo[-1]
-        Logger.info(f"Processing photo: {photo.file_id}, size: {photo.file_size} bytes")
+        # Logger.info(f"Processing photo: {photo.file_id}, size: {photo.file_size} bytes")
 
         file_info = await message.bot.get_file(photo.file_id)
         file_content = await message.bot.download_file(file_info.file_path)
         original_photo_data = file_content.read()
 
-        Logger.info("Starting OCR processing...")
+        # Logger.info("Starting OCR processing...")
 
         ocr_result = await ocr_service.extract_from_bytes(
             original_photo_data, f"photo_{photo.file_id}.jpg"
@@ -730,14 +730,14 @@ async def handle_process_photo(
             }
 
         extracted_text = ocr_result.unwrap()
-        Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
+        # Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
 
         visualized_photo_data = ocr_service.draw_bounding_boxes(
             original_photo_data, extracted_text
         )
 
         cleaned_text = ocr_service.clean_html_tags(extracted_text)
-        Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
+        # Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
 
         file_data = {
             "id": f"photo_ocr_{photo.file_id}",
@@ -749,7 +749,7 @@ async def handle_process_photo(
             "mime_type": "text/plain",
         }
 
-        api_result = await api_service.create_file(
+        await api_service.create_file(
             path=file_data["name"],
             content=cleaned_text,
             user_id=str(user.id),
@@ -783,7 +783,7 @@ async def handle_process_photo(
         else:
             preview_text = cleaned_text[:4000] + "\n\n... (текст обрезан)"
 
-        Logger.info(f"Photo OCR completed successfully for user {user.tg_id}")
+        # Logger.info(f"Photo OCR completed successfully for user {user.tg_id}")
 
         return {
             "context": await context_engine.get(
