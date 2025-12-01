@@ -127,7 +127,7 @@ async def handle_download_file(
 
     if len(args) >= 1:
         file_id = args[0]
-        container_id = state_service.get_work_container(str(user.id)).id
+        container_id = state_service.get_work_container(str(user.id))
 
         Logger.info(f"Downloading file: {file_id} from container: {container_id}")
 
@@ -855,7 +855,7 @@ async def handle_read_file_impl(
         }
 
     file_id = args[0]
-    container_id = state_service.get_work_container(str(user.tg_id)).id
+    container_id = state_service.get_work_container(str(user.tg_id))
 
     content_result = await api_service.get_file_content(str(file_id), str(container_id))
 

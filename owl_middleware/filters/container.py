@@ -51,7 +51,7 @@ async def handle_choose_container_callback(
         state_service.set_work_container(str(user.tg_id), str(container.id))
 
         message: types.Message = str(container.id)
-        await message.reply_to_message.pin(disable_notification=True)
+        # await message.reply_to_message.pin(disable_notification=True)
 
         return {
             "context": await cen.get(
