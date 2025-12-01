@@ -5,7 +5,7 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
-from services import AuthService, FileService, ContainerService, ApiService
+from services import AuthService, FileService, ContainerService, ApiService, State
 from fastbot.decorators import (
     with_template_engine,
     with_parse_mode,
@@ -19,48 +19,76 @@ from fastbot.decorators import (
 async def handle_read_file_callback(
     callback: types.CallbackQuery,
     user: User,
+    state_service: State,
     ten: TemplateEngine,
     cen: ContextEngine,
     file_service: FileService,
     api_service: ApiService,
 ):
-    await callback.answer()
-
-    file_id = callback.data.replace("file_", "")
-
-    file_result = await file_service.get_file(file_id)
-    if file_result.is_ok() and file_result.unwrap():
-        file = file_result.unwrap()
-        path = f"/{file.id}_{file.name}"
-    else:
-        path = file_id
-
-    read_result = await api_service.read_file(path)
-
-    if read_result.is_err():
-        error = read_result.unwrap_err()
-        Logger.error(f"Read file error: {error}")
-        return {"context": await cen.get("read_file", error=f"Read error: {error}")}
-
-    file_data = read_result.unwrap()
-
-    return {
-        "context": await cen.get(
-            "read_file",
-            path=file_data.get("path", path),
-            content=file_data.get("content", ""),
-            size=file_data.get("size", 0),
-        )
-    }
-
     try:
-        pass
+        await callback.answer()
+
+        callback_data = callback.data
+
+        if not callback_data.startswith("file_"):
+            return {
+                "context": await cen.get(
+                    "read_file", error="Неверный формат callback_data"
+                )
+            }
+
+        parts = callback_data[5:].split("_")
+
+        if len(parts) < 2:
+            return {
+                "context": await cen.get("read_file", error="Неверный формат данных")
+            }
+
+        search_id = parts[0]
+        try:
+            file_index = int(parts[1])
+        except ValueError:
+            return {
+                "context": await cen.get("read_file", error="Неверный индекс файла")
+            }
+
+        file_path = state_service.get_file_path(str(user.tg_id), search_id, file_index)
+
+        if not file_path:
+            return {
+                "context": await cen.get(
+                    "read_file", error="Файл не найден или результаты поиска устарели"
+                )
+            }
+
+        read_result = await api_service.read_file(file_path)
+
+        if read_result.is_err():
+            error = read_result.unwrap_err()
+            Logger.error(f"Read file error for path {file_path}: {error}")
+            return {
+                "context": await cen.get(
+                    "read_file", error=f"Ошибка чтения файла: {error}"
+                )
+            }
+
+        file_data = read_result.unwrap()
+
+        return {
+            "context": await cen.get(
+                "read_file",
+                path=file_data.get("path", file_path),
+                content=file_data.get("content", ""),
+                size=file_data.get("size", 0),
+            )
+        }
+
     except Exception as e:
         Logger.error(f"Error in handle_read_file_callback: {e}")
         return {
             "context": await cen.get(
                 "read_file",
-                error=f"Ошибка при выборе контейнера: {str(e)}",
+                error=f"Ошибка при чтении файла: {str(e)}",
             )
         }
 

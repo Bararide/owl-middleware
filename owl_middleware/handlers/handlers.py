@@ -596,6 +596,7 @@ async def handle_file_upload(
 async def handle_search(
     message: Message,
     user: User,
+    state_service: State,
     ten: TemplateEngine,
     file_service: FileService,
     auth_service: AuthService,
@@ -634,13 +635,27 @@ async def handle_search(
     search_data = search_result.unwrap()
     results = search_data.get("results", [])
 
+    file_paths = []
+    for result in results:
+        path = result.get("path", "")
+        if path:
+            file_paths.append(path)
+
+    search_id = state_service.add_search_results(str(user.tg_id), query, file_paths)
+
+    file_items = []
+    for i, path in enumerate(file_paths):
+        file_name = path.split("/")[-1] if "/" in path else path
+        file_items.append(
+            {"search_id": search_id, "file_index": i, "name": file_name, "path": path}
+        )
+
     return {
         "context": await cen.get("semantic_search", query=query),
-        "buttons_context": await cen.get(
-            "search_file_buttons",
-            file_names=[result.get("path", "Unknown") for result in results],
-            files_count=len(results),
-        ),
+        "buttons_context": {
+            "file_items": file_items,
+            "files_count": len(file_items),
+        },
         "row_width": 1,
     }
 

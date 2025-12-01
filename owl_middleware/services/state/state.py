@@ -1,11 +1,19 @@
 from typing import Optional, Any, Dict, List
 from pydantic import BaseModel
 from datetime import datetime
+import uuid
+
+
+class SearchResult(BaseModel):
+    query: str
+    paths: List[str]
+    timestamp: datetime = datetime.now()
 
 
 class StateConfig(BaseModel):
     user_id: str
     work_container_id: Optional[str] = None
+    search_results: Dict[str, SearchResult] = {}
     last_activity: datetime = datetime.now()
     metadata: Dict[str, Any] = {}
 
@@ -33,13 +41,28 @@ class State:
         state.work_container_id = None
         state.last_activity = datetime.now()
 
+    def add_search_results(self, user_id: str, query: str, paths: List[str]) -> str:
+        state = self.get_state(user_id)
+        search_id = str(uuid.uuid4())[:8]
+
+        state.search_results[search_id] = SearchResult(
+            query=query, paths=paths, timestamp=datetime.now()
+        )
+        state.last_activity = datetime.now()
+
+        return search_id
+
+    def get_search_result(self, user_id: str, search_id: str) -> Optional[SearchResult]:
+        state = self.get_state(user_id)
+        return state.search_results.get(search_id)
+
+    def get_file_path(
+        self, user_id: str, search_id: str, file_index: int
+    ) -> Optional[str]:
+        result = self.get_search_result(user_id, search_id)
+        if result and 0 <= file_index < len(result.paths):
+            return result.paths[file_index]
+        return None
+
     def cleanup_old_states(self, hours: int = 24) -> None:
-        cutoff_time = datetime.now().timestamp() - (hours * 3600)
-        to_remove = []
-
-        for user_id, state in self._state_configs.items():
-            if state.last_activity.timestamp() < cutoff_time:
-                to_remove.append(user_id)
-
-        for user_id in to_remove:
-            del self._state_configs[user_id]
+        self._state_configs.clear()

@@ -1,8 +1,6 @@
 [
-    {% for file_name in file_names %}
-    {% set safe_name = file_name|truncate(30) %}
-    {% set callback_data = "file_" ~ safe_name|replace(" ", "_")|replace("-", "_")|replace(".", "_")|lower %}
-    {"text": "📦 {{ file_name }}", "callback_data": "{{ callback_data }}"}
+    {% for file in file_items %}
+    {"text": "📦 {{ file.name|truncate(25) }}", "callback_data": "file_{{ file.search_id }}_{{ file.file_index }}"}
     {% if not loop.last %},{% endif %}
     {% endfor %}
     {% if files_count > 0 %},
