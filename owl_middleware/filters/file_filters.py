@@ -12,17 +12,20 @@ from fastbot.decorators import (
     with_auto_reply,
 )
 
+import base64
+import html
+import fitz
+
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
-@with_auto_reply("commands/read_file.j2")
+@with_auto_reply("commands/read_file_impl.j2")
 async def handle_read_file_callback(
     callback: types.CallbackQuery,
     user: User,
     state_service: State,
     ten: TemplateEngine,
     cen: ContextEngine,
-    file_service: FileService,
     api_service: ApiService,
 ):
     try:
@@ -61,25 +64,120 @@ async def handle_read_file_callback(
                 )
             }
 
-        read_result = await api_service.read_file(file_path)
+        file_id = file_path
+        if file_path.startswith("/"):
+            file_id = file_path[1:]
 
-        if read_result.is_err():
-            error = read_result.unwrap_err()
-            Logger.error(f"Read file error for path {file_path}: {error}")
+        container_id = state_service.get_work_container(str(user.tg_id))
+
+        if not container_id:
+            return {
+                "context": await cen.get(
+                    "read_file", error="Сначала выберите контейнер для работы"
+                )
+            }
+
+        content_result = await api_service.get_file_content(
+            str(file_id), str(container_id)
+        )
+
+        if content_result.is_err():
+            error = content_result.unwrap_err()
+            Logger.error(f"Error read file: {error}")
             return {
                 "context": await cen.get(
                     "read_file", error=f"Ошибка чтения файла: {error}"
                 )
             }
 
-        file_data = read_result.unwrap()
+        content = content_result.unwrap()
+
+        def is_base64_encoded(s):
+            try:
+                if len(s) > 100 and all(
+                    c
+                    in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+                    for c in s[:100]
+                ):
+                    decoded = base64.b64decode(s[:100])
+                    return True
+                return False
+            except:
+                return False
+
+        if content.startswith("%PDF-") or (
+            is_base64_encoded(content)
+            and base64.b64decode(content[:20]).startswith(b"%PDF-")
+        ):
+            try:
+                if is_base64_encoded(content):
+                    pdf_bytes = base64.b64decode(content)
+                else:
+                    pdf_bytes = content.encode("latin-1")
+
+                pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+                extracted_text = ""
+                for page_num in range(pdf_document.page_count):
+                    page = pdf_document.load_page(page_num)
+                    page_text = page.get_text()
+                    if page_text:
+                        extracted_text += page_text + "\n\n"
+
+                pdf_document.close()
+
+                if extracted_text.strip():
+                    content = html.escape(extracted_text.strip())
+
+                    max_length = 3000
+                    if len(content) > max_length:
+                        content = content[:max_length] + "\n\n... (текст обрезан)"
+
+                    return {
+                        "context": await cen.get(
+                            "read_file_impl",
+                            content=content,
+                            truncated=len(extracted_text) > max_length,
+                            error="0",
+                            is_pdf=True,
+                        )
+                    }
+                else:
+                    return {
+                        "context": await cen.get(
+                            "read_file_impl",
+                            content="",
+                            truncated="",
+                            error="PDF файл не содержит извлекаемого текста (возможно, это сканированное изображение)",
+                            is_pdf=True,
+                        )
+                    }
+
+            except Exception as e:
+                Logger.error(f"PDF extraction error: {e}")
+                return {
+                    "context": await cen.get(
+                        "read_file_impl",
+                        content="",
+                        truncated="",
+                        error=f"Ошибка извлечения текста из PDF: {str(e)}",
+                        is_pdf=True,
+                    )
+                }
+
+        content = html.escape(content)
+
+        max_length = 3000
+        if len(content) > max_length:
+            content = content[:max_length] + "\n\n... (сообщение обрезано)"
 
         return {
             "context": await cen.get(
-                "read_file",
-                path=file_data.get("path", file_path),
-                content=file_data.get("content", ""),
-                size=file_data.get("size", 0),
+                "read_file_impl",
+                content=content,
+                truncated=len(content_result.unwrap()) > max_length,
+                error="",
+                is_pdf=False,
             )
         }
 

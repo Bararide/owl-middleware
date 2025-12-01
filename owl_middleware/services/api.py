@@ -412,6 +412,8 @@ class ApiService:
         if connect_result.is_err():
             return connect_result
 
+        Logger.error(f"{path}")
+
         params = {"path": path}
 
         try:

@@ -835,6 +835,8 @@ async def handle_read_file(
     else:
         path = file_identifier
 
+    Logger.error(f"READ HANDLER {path}")
+
     read_result = await api_service.read_file(path)
 
     if read_result.is_err():
