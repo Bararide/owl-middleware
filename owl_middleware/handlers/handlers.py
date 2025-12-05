@@ -476,7 +476,7 @@ async def handle_file_upload(
 
     file_data = {
         "id": document.file_id,
-        "container_id": container.id,
+        "container_id": container,
         "name": document.file_name or f"file_{document.file_id}",
         "size": document.file_size,
         "user_id": str(user.tg_id),
@@ -539,7 +539,7 @@ async def handle_file_upload(
                 path=file.id,
                 content=extracted_text,
                 user_id=str(user.id),
-                container_id=container.id,
+                container_id=container,
             )
 
         elif document.mime_type and document.mime_type.startswith("text/"):
@@ -548,7 +548,7 @@ async def handle_file_upload(
                 path=file.id,
                 content=content_text,
                 user_id=str(user.id),
-                container_id=container.id,
+                container_id=container,
             )
         else:
             content_base64 = base64.b64encode(binary_content).decode("ascii")
@@ -556,7 +556,7 @@ async def handle_file_upload(
                 path=file.id,
                 content=content_base64,
                 user_id=str(user.id),
-                container_id=container.id,
+                container_id=container,
             )
 
         if api_result.is_err():
@@ -578,7 +578,7 @@ async def handle_file_upload(
 
         return {
             "context": await cen.get(
-                "file_upload", success=True, file=file, container_name=container.id
+                "file_upload", success=True, file=file, container_name=container
             )
         }
 

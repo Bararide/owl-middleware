@@ -361,7 +361,7 @@ class ApiService:
         payload = {
             "query": query,
             "limit": limit,
-            "user_id": str(user.tg_id),
+            "user_id": str(user.id),
             "container_id": str(container.id),
         }
 
@@ -371,7 +371,7 @@ class ApiService:
                 json=payload,
                 headers={"Content-Type": "application/json"},
             ) as response:
-                Logger.info(f"Semantic search response: {response.status}")
+                # Logger.info(f"Semantic search response: {response.status}")
 
                 response_text = await response.text()
                 # Logger.info(f"Raw response text: {response_text}")
@@ -458,8 +458,6 @@ class ApiService:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-
-                    # Logger.info(f"Raw file content response: {type(data)} - {data}")
 
                     if isinstance(data, dict):
                         if "data" in data:
