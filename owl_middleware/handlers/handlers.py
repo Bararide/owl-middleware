@@ -614,14 +614,25 @@ async def handle_search(
             )
         }
 
-    containers_result = await container_service.get_containers_by_user_id(
-        str(user.tg_id)
-    )
+    container_id = state_service.get_work_container(str(user.tg_id))
+
+    container_result = await container_service.get_container(container_id)
+
+    if container_result.is_err():
+        # Logger.error("container not found")
+        return {
+            "context": await cen.get(
+                "semantic_search",
+                error="Ошибка при получении контейнеров.",
+            )
+        }
+
+    container = container_result.unwrap()
 
     search_result = await api_service.semantic_search(
         query,
         user,
-        containers_result.unwrap()[0],
+        container,
         limit=10,
     )
 
@@ -703,17 +714,17 @@ async def handle_process_photo(
             )
         }
 
-    container = state_service.get_work_container(user.tg_id)
+    container = state_service.get_work_container(str(user.tg_id))
 
     try:
         photo = message.photo[-1]
-        # Logger.info(f"Processing photo: {photo.file_id}, size: {photo.file_size} bytes")
+        Logger.info(f"Processing photo: {photo.file_id}, size: {photo.file_size} bytes")
 
         file_info = await message.bot.get_file(photo.file_id)
         file_content = await message.bot.download_file(file_info.file_path)
         original_photo_data = file_content.read()
 
-        # Logger.info("Starting OCR processing...")
+        Logger.info("Starting OCR processing...")
 
         ocr_result = await ocr_service.extract_from_bytes(
             original_photo_data, f"photo_{photo.file_id}.jpg"
@@ -730,18 +741,18 @@ async def handle_process_photo(
             }
 
         extracted_text = ocr_result.unwrap()
-        # Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
+        Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
 
         visualized_photo_data = ocr_service.draw_bounding_boxes(
             original_photo_data, extracted_text
         )
 
         cleaned_text = ocr_service.clean_html_tags(extracted_text)
-        # Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
+        Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
 
         file_data = {
             "id": f"photo_ocr_{photo.file_id}",
-            "container_id": container.id,
+            "container_id": container,
             "name": f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             "size": len(cleaned_text.encode("utf-8")),
             "user_id": str(user.id),
@@ -753,7 +764,7 @@ async def handle_process_photo(
             path=file_data["name"],
             content=cleaned_text,
             user_id=str(user.id),
-            container_id=container.id,
+            container_id=container,
         )
 
         visualized_photo = BufferedInputFile(
@@ -765,7 +776,7 @@ async def handle_process_photo(
             photo=visualized_photo,
             caption=f"🔍 Визуализация распознанного текста\n"
             f"📊 Распознано блоков: {len(ocr_service.parse_bounding_boxes(extracted_text))}\n"
-            f"📁 Контейнер: {container.id}",
+            f"📁 Контейнер: {container}",
         )
 
         file_to_send = BufferedInputFile(
@@ -783,7 +794,7 @@ async def handle_process_photo(
         else:
             preview_text = cleaned_text[:4000] + "\n\n... (текст обрезан)"
 
-        # Logger.info(f"Photo OCR completed successfully for user {user.tg_id}")
+        Logger.info(f"Photo OCR completed successfully for user {user.tg_id}")
 
         return {
             "context": await context_engine.get(
@@ -791,7 +802,7 @@ async def handle_process_photo(
                 success=True,
                 extracted_text=preview_text,
                 characters_count=len(cleaned_text),
-                container_name=container.id,
+                container_name=container,
                 file_id=file_data["name"],
                 is_truncated=len(cleaned_text) > 4000,
                 boxes_count=len(ocr_service.parse_bounding_boxes(extracted_text)),
