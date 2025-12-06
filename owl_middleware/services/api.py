@@ -371,11 +371,7 @@ class ApiService:
                 json=payload,
                 headers={"Content-Type": "application/json"},
             ) as response:
-                # Logger.info(f"Semantic search response: {response.status}")
-
                 response_text = await response.text()
-                # Logger.info(f"Raw response text: {response_text}")
-                # Logger.info(f"Response headers: {dict(response.headers)}")
 
                 if response.status == 200:
                     try:
