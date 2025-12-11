@@ -91,9 +91,10 @@ async def file_list_context(files: list[File]):
 
 @register_context("read_file_impl")
 async def read_file_impl_context(
-    content: str, truncated: str, error: str, is_pdf: bool
+    file_name: str, content: str, truncated: str, error: str, is_pdf: bool
 ):
     return {
+        "file_name": file_name,
         "content": content,
         "truncated": truncated,
         "error": error,

@@ -951,6 +951,7 @@ async def handle_read_file_impl(
                 return {
                     "context": await cen.get(
                         "read_file_impl",
+                        file_name=file_id,
                         content=content,
                         truncated=len(extracted_text) > max_length,
                         error="0",
@@ -961,6 +962,7 @@ async def handle_read_file_impl(
                 return {
                     "context": await cen.get(
                         "read_file_impl",
+                        file_name="",
                         content="",
                         truncated="",
                         error="PDF файл не содержит извлекаемого текста (возможно, это сканированное изображение)",
@@ -973,6 +975,7 @@ async def handle_read_file_impl(
             return {
                 "context": await cen.get(
                     "read_file_impl",
+                    file_name="",
                     content="",
                     truncated="",
                     error=f"Ошибка извлечения текста из PDF: {str(e)}",
@@ -989,6 +992,7 @@ async def handle_read_file_impl(
     return {
         "context": await cen.get(
             "read_file_impl",
+            file_name=file_id,
             content=content,
             truncated=len(content_result.unwrap()) > max_length,
             error="",

@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -6,7 +6,6 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
-from owl_middleware.services.ocr import Ocr
 from services import AuthService, FileService, ContainerService, ApiService, State
 from fastbot.decorators import (
     with_template_engine,
