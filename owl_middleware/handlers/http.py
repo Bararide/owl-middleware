@@ -344,15 +344,15 @@ async def upload_file_in_container(
 
         Logger.info(f"File: {file_name}, size: {file_size} bytes, type: {mime_type}")
 
-        # max_file_size = 10 * 1024 * 1024
-        # if file_size > max_file_size:
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
-        #     )
+        max_file_size = 10 * 1024 * 1024
+        if file_size > max_file_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
+            )
 
         Logger.info("1. Checking container limits...")
-        limits_result = await container_service.check_container_limits(container_id)
+        # limits_result = await container_service.check_container_limits(container_id)
         # if limits_result.is_ok():
         #     limits = limits_result.unwrap()
         #     storage_used = limits["storage"]["used"]

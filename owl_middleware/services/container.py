@@ -82,12 +82,17 @@ class ContainerService:
         self, container_id: str
     ) -> Result[Dict[str, Any], Exception]:
         container_result = await self.get_container(container_id)
+        Logger.error("1")
         if container_result.is_err():
             return container_result
+
+        Logger.error("2")
 
         file_service = FileService(self.db_service, self.api_service)
         container = container_result.unwrap()
         files = await file_service.get_files_by_container(container.id)
+
+        Logger.error("3")
 
         total_size = sum(file.size or 0 for file in files)
 
@@ -113,6 +118,8 @@ class ContainerService:
                 ),
             },
         }
+
+        Logger.error("4")
 
         return Ok(limits_status)
 
