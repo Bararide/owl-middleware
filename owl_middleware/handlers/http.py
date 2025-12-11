@@ -344,25 +344,25 @@ async def upload_file_in_container(
 
         Logger.info(f"File: {file_name}, size: {file_size} bytes, type: {mime_type}")
 
-        max_file_size = 10 * 1024 * 1024
-        if file_size > max_file_size:
-            raise HTTPException(
-                status_code=400,
-                detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
-            )
+        # max_file_size = 10 * 1024 * 1024
+        # if file_size > max_file_size:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
+        #     )
 
         Logger.info("1. Checking container limits...")
         limits_result = await container_service.check_container_limits(container_id)
-        if limits_result.is_ok():
-            limits = limits_result.unwrap()
-            storage_used = limits["storage"]["used"]
-            storage_limit = limits["storage"]["limit"]
+        # if limits_result.is_ok():
+        #     limits = limits_result.unwrap()
+        #     storage_used = limits["storage"]["used"]
+        #     storage_limit = limits["storage"]["limit"]
 
-            if storage_used + file_size > storage_limit:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Storage quota exceeded. Available: {storage_limit - storage_used} bytes, file size: {file_size} bytes",
-                )
+        #     if storage_used + file_size > storage_limit:
+        #         raise HTTPException(
+        #             status_code=400,
+        #             detail=f"Storage quota exceeded. Available: {storage_limit - storage_used} bytes, file size: {file_size} bytes",
+        #         )
 
         file_data = {
             "id": f"http_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name}",

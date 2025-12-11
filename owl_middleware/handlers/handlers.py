@@ -127,7 +127,7 @@ async def handle_download_file(
 
     if len(args) >= 1:
         file_id = args[0]
-        container_id = state_service.get_work_container(str(user.id))
+        container_id = state_service.get_work_container(str(user.tg_id))
 
         Logger.info(f"Downloading file: {file_id} from container: {container_id}")
 
