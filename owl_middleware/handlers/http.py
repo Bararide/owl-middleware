@@ -549,6 +549,92 @@ async def check_health(request: Request, api_service: ApiService):
     return {"status": "healthy", "success": True}
 
 
+@http_router.get("/containers/{container_id}/files/refresh")
+@inject("file_service")
+@inject("container_service")
+@inject("api_service")
+@inject("auth_service")
+async def list_files(
+    container_id: str,
+    file_service: FileService,
+    container_service: ContainerService,
+    api_service: ApiService,
+    auth_service: AuthService,
+    request: Request,
+):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+        Logger.error(f"Query token: {request.query_params.get('token')}")
+
+    if not token:
+        Logger.error("No token provided")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    files_api_result = await api_service.get_files_by_container_id_and_rebuild_index(
+        current_user.id, container_id
+    )
+
+    if files_api_result.is_err():
+        raise HTTPException(
+            status_code=500, detail="Error fetching files from container"
+        )
+
+    container_files = files_api_result.unwrap()
+
+    files_db_result = await file_service.get_files_by_container(container_id)
+    db_files = files_db_result.unwrap() if files_db_result.is_ok() else []
+
+    db_files_map = {file.name: file for file in db_files}
+
+    enriched_files = []
+    for container_file in container_files:
+        file_name = container_file.get("name", "")
+        db_file = db_files_map.get(file_name)
+
+        enriched_file = {
+            "id": db_file.id if db_file else None,
+            "name": file_name,
+            "path": container_file.get("path", ""),
+            "content": container_file.get("content", ""),
+            "size": container_file.get("size", 0),
+            "category": container_file.get("category", "unknown"),
+            "is_directory": container_file.get("is_directory", False),
+            "exists": container_file.get("exists", True),
+            "container_id": container_id,
+            "user_id": current_user.id,
+            "created_at": (
+                db_file.created_at.isoformat()
+                if db_file and db_file.created_at
+                else None
+            ),
+            "mime_type": (
+                db_file.mime_type if db_file else _detect_mime_type(file_name)
+            ),
+        }
+        enriched_files.append(enriched_file)
+
+    return {
+        "data": enriched_files,
+        "count": len(enriched_files),
+        "container_id": container_id,
+    }
+
+
 @http_router.get("/containers/{container_id}/files")
 @inject("file_service")
 @inject("container_service")
