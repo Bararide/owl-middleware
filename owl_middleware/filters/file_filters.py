@@ -1,3 +1,4 @@
+import datetime
 from aiogram import types
 from aiogram.enums import ParseMode
 
@@ -5,6 +6,7 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
+from owl_middleware.services.ocr import Ocr
 from services import AuthService, FileService, ContainerService, ApiService, State
 from fastbot.decorators import (
     with_template_engine,
@@ -241,14 +243,78 @@ async def callback_file_list(
 
 @with_template_engine
 @with_parse_mode(ParseMode.HTML)
-@with_auto_reply("filters/ocr_file_upload.j2")
+@with_auto_reply("filters/ocr_save.j2")
 async def callback_ocr_file_filter(
     callback: types.CallbackQuery,
     user: User,
+    state_service: State,
     ten: TemplateEngine,
-    file_service: FileService,
-    cen: ContextEngine
+    cen: ContextEngine,
+    api_service: ApiService,
 ):
+    try:
+        await callback.answer()
+
+        state = state_service.get_state(str(user.tg_id))
+        ocr_data = state.metadata.get("last_ocr_result")
+
+        if not ocr_data:
+            return {
+                "context": await cen.get(
+                    "ocr_save",
+                    error="Данные OCR не найдены. Пожалуйста, отправьте новое фото.",
+                )
+            }
+
+        container_id = ocr_data.get("container_id") or state_service.get_work_container(
+            str(user.tg_id)
+        )
+
+        if not container_id:
+            return {
+                "context": await cen.get(
+                    "ocr_save",
+                    error="Контейнер не выбран. Сначала выберите контейнер командой /container.",
+                )
+            }
+
+        file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+
+        result = await api_service.create_file(
+            path=file_name,
+            content=ocr_data["text"],
+            user_id=str(user.id),
+            container_id=container_id,
+        )
+
+        if result.is_err():
+            error = result.unwrap_err()
+            Logger.error(f"Error saving OCR result: {error}")
+            return {
+                "context": await cen.get(
+                    "ocr_save", error=f"Ошибка сохранения: {error}"
+                )
+            }
+
+        if "last_ocr_result" in state.metadata:
+            del state.metadata["last_ocr_result"]
+        if "last_ocr_photo" in state.metadata:
+            del state.metadata["last_ocr_photo"]
+
+        return {
+            "context": await cen.get(
+                "ocr_save",
+                file_name=file_name,
+                characters_count=len(ocr_data["text"]),
+                container_id=container_id,
+            )
+        }
+
+    except Exception as e:
+        Logger.error(f"Error in handle_ocr_save_callback: {e}")
+        return {
+            "context": await cen.get("ocr_save", error=f"Ошибка сохранения: {str(e)}")
+        }
 
 
 @with_template_engine

@@ -14,6 +14,21 @@ async def start_context(user: User):
     }
 
 
+@register_context("ocr_save")
+async def registration_ocr_save(
+    error: str = None,
+    file_name: str = None,
+    characters_count: int = 0,
+    container_id: str = None,
+):
+    return {
+        "error": error,
+        "file_name": file_name,
+        "characters_count": characters_count,
+        "container_id": container_id,
+    }
+
+
 @register_context("registration_error")
 async def registration_error_context(error: str):
     return {"error": error, "has_access": False, "success": False}

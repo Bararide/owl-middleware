@@ -3,6 +3,7 @@ from .file_filters import (
     callback_file_upload,
     handle_create_container_callback,
     handle_read_file_callback,
+    callback_ocr_file_filter,
 )
 
 from .container import (
@@ -15,4 +16,5 @@ __all__ = [
     "handle_create_container_callback",
     "handle_choose_container_callback",
     "handle_read_file_callback",
+    "callback_ocr_file_filter",
 ]

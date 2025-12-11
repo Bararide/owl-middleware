@@ -161,6 +161,10 @@ async def main() -> None:
         filters.handle_choose_container_callback, F.data.startswith("container_")
     )
 
+    await bot_builder.add_callback_query_handler(
+        filters.callback_ocr_file_filter, F.data.startswith("ocr_")
+    )
+
     await bot_builder.add_handler(handlers.handle_file_upload, F.document)
 
     await bot_builder.add_handler(handlers.handle_process_photo, F.photo)

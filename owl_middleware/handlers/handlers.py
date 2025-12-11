@@ -750,6 +750,19 @@ async def handle_process_photo(
         cleaned_text = ocr_service.clean_html_tags(extracted_text)
         Logger.info(f"After HTML cleaning: {len(cleaned_text)} characters")
 
+        state = state_service.get_state(str(user.tg_id))
+        state.metadata["last_ocr_result"] = {
+            "text": cleaned_text,
+            "extracted_text": extracted_text,
+            "container_id": container,
+            "photo_bytes": original_photo_data,
+        }
+        state.metadata["last_ocr_photo"] = {
+            "photo_bytes": original_photo_data,
+            "file_id": photo.file_id,
+            "timestamp": datetime.now(),
+        }
+
         file_data = {
             "id": f"photo_ocr_{photo.file_id}",
             "container_id": container,
@@ -759,13 +772,6 @@ async def handle_process_photo(
             "created_at": datetime.now(),
             "mime_type": "text/plain",
         }
-
-        await api_service.create_file(
-            path=file_data["name"],
-            content=cleaned_text,
-            user_id=str(user.id),
-            container_id=container,
-        )
 
         visualized_photo = BufferedInputFile(
             visualized_photo_data,

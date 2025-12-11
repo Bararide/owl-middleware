@@ -29,6 +29,7 @@ from .context import (
     registration_choose_buttons_context,
     choose_container_filter_context,
     registration_search_menu_buttons,
+    registration_ocr_save,
 )
 
 ALL_CONTEXTS = [
@@ -60,6 +61,7 @@ ALL_CONTEXTS = [
     registration_choose_buttons_context,
     choose_container_filter_context,
     registration_search_menu_buttons,
+    registration_ocr_save,
 ]
 
 __all__ = [
