@@ -239,16 +239,16 @@ async def callback_file_list(
     return {"context": await cen.get("file_list", files=all_files)}
 
 
-# @with_template_engine
-# @with_parse_mode(ParseMode.HTML)
-# @with_auto_reply("filters/ocr_file_upload.j2")
-# async def callback_ocr_file_filter(
-#     callback: types.CallbackQuery,
-#     user: User,
-#     ten: TemplateEngine,
-#     file_service: FileService,
-#     cen: ContextEngine
-# ):
+@with_template_engine
+@with_parse_mode(ParseMode.HTML)
+@with_auto_reply("filters/ocr_file_upload.j2")
+async def callback_ocr_file_filter(
+    callback: types.CallbackQuery,
+    user: User,
+    ten: TemplateEngine,
+    file_service: FileService,
+    cen: ContextEngine
+):
 
 
 @with_template_engine
