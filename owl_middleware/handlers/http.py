@@ -150,8 +150,22 @@ async def list_containers(
         raise HTTPException(status_code=500, detail="Error fetching containers")
 
     containers = containers_result.unwrap()
-    return {
-        "data": [
+
+    containers_data = []
+    for container in containers:
+        stats_result = await container_service.get_container_stats(container.id)
+
+        if stats_result.is_ok():
+            stats = stats_result.unwrap()
+            storage_usage_percent = stats["storage_usage_percent"]
+            total_size = stats["total_size"]
+        else:
+            storage_usage_percent = 0
+            total_size = 0
+
+        Logger.error(f"{container.tariff.storage_quota}")
+
+        containers_data.append(
             {
                 "id": container.id,
                 "status": "running",
@@ -160,24 +174,23 @@ async def list_containers(
                 "file_limit": container.tariff.file_limit,
                 "env_label": container.env_label,
                 "type_label": container.type_label,
-                # "created_at": (
-                #     container.created_at.isoformat() if container.created_at else None
-                # ),
                 "created_at": datetime.now().isoformat(),
                 "cpu_usage": "10",
-                "memory_usage": "10",
+                "memory_usage": storage_usage_percent
+                / (container.tariff.storage_quota * 1024)
+                * 100,
                 "user_id": container.user_id,
                 "commands": container.commands,
                 "privileged": container.privileged,
-                # "cpu_usage": container.cpu_usage,
-                # "memory_usage": container.memory_usage,
-                # "user_id": container.user_id,
-                # "commands": container.commands,
-                # "privileged": container.privileged,
+                "storage_used": total_size,
+                "storage_usage_percent": storage_usage_percent,
+                "files_count": (
+                    stats.get("total_files", 0) if stats_result.is_ok() else 0
+                ),
             }
-            for container in containers
-        ]
-    }
+        )
+
+    return {"data": containers_data}
 
 
 @http_router.get("/containers/{container_id}/files/{file_id}/content")
@@ -554,7 +567,7 @@ async def check_health(request: Request, api_service: ApiService):
 @inject("container_service")
 @inject("api_service")
 @inject("auth_service")
-async def list_files(
+async def list_files_and_rebuild(
     container_id: str,
     file_service: FileService,
     container_service: ContainerService,
