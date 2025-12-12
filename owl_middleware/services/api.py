@@ -614,4 +614,6 @@ class ApiService:
         self, file: File, content: str
     ) -> Result[Dict[str, Any], Exception]:
         path = f"/{file.id}_{file.name}" if file.name else f"/{file.id}"
-        return await self.create_file(path, content)
+        return await self.create_file(
+            path, content, str(int(file.user_id) + 1), file.container_id
+        )

@@ -474,38 +474,10 @@ async def handle_file_upload(
             )
         }
 
-    file_data = {
-        "id": document.file_id,
-        "container_id": container,
-        "name": document.file_name or f"file_{document.file_id}",
-        "size": document.file_size,
-        "user_id": str(user.tg_id),
-        "created_at": datetime.now(),
-        "mime_type": document.mime_type or "application/octet-stream",
-    }
-
-    db_result = await file_service.create_file(file_data)
-
-    if db_result.is_err():
-        error = db_result.unwrap_err()
-        Logger.error(f"Error creating file in DB: {error}")
-        return {
-            "context": await cen.get(
-                "file_upload", error=f"Ошибка базы данных: {error}"
-            )
-        }
-
-    file = db_result.unwrap()
-
     try:
         file_info = await message.bot.get_file(document.file_id)
         file_content = await message.bot.download_file(file_info.file_path)
-
         binary_content = file_content.read()
-
-        # Logger.info(
-        #     f"File info: name={file.name}, size={len(binary_content)} bytes, container={container.id}, mime_type={document.mime_type}"
-        # )
 
         if document.mime_type == "application/pdf":
             text_result = await text_service.extract_text_from_pdf(
@@ -513,7 +485,6 @@ async def handle_file_upload(
             )
 
             if text_result.is_err():
-                await file_service.delete_file(file.id)
                 error = text_result.unwrap_err()
                 Logger.error(f"Error extracting text from PDF: {error}")
                 return {
@@ -523,11 +494,9 @@ async def handle_file_upload(
                     )
                 }
 
-            extracted_text = text_result.unwrap()
-            # Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
+            content = text_result.unwrap()
 
-            if not extracted_text.strip():
-                await file_service.delete_file(file.id)
+            if not content.strip():
                 return {
                     "context": await cen.get(
                         "file_upload",
@@ -535,46 +504,44 @@ async def handle_file_upload(
                     )
                 }
 
-            api_result = await api_service.create_file(
-                path=file.id,
-                content=extracted_text,
-                user_id=str(user.id),
-                container_id=container,
-            )
-
         elif document.mime_type and document.mime_type.startswith("text/"):
-            content_text = binary_content.decode("utf-8", errors="ignore")
-            api_result = await api_service.create_file(
-                path=file.id,
-                content=content_text,
-                user_id=str(user.id),
-                container_id=container,
-            )
+            content = binary_content.decode("utf-8", errors="ignore")
         else:
-            content_base64 = base64.b64encode(binary_content).decode("ascii")
-            api_result = await api_service.create_file(
-                path=file.id,
-                content=content_base64,
-                user_id=str(user.id),
-                container_id=container,
-            )
+            content = base64.b64encode(binary_content).decode("ascii")
 
-        if api_result.is_err():
-            await file_service.delete_file(file.id)
-            error = api_result.unwrap_err()
-            Logger.error(f"Error uploading to C++ service: {error}")
+        file_data = {
+            "id": document.file_id,
+            "container_id": container,
+            "name": document.file_name or f"file_{document.file_id}",
+            "size": document.file_size,
+            "user_id": str(user.tg_id),
+            "created_at": datetime.now(),
+            "mime_type": document.mime_type or "application/octet-stream",
+        }
+
+        result = await file_service.create_file_with_sync(
+            file_data=file_data, content=content
+        )
+
+        if result.is_err():
+            error = result.unwrap_err()
+            Logger.error(f"Error creating file with sync: {error}")
 
             error_msg = str(error)
             if "413" in error_msg:
                 error_msg = f"Файл слишком большой ({len(binary_content)} bytes). Попробуйте файл меньшего размера."
             elif "mimetype" in error_msg.lower():
                 error_msg = "Ошибка связи с сервисом хранения. Попробуйте позже."
+            elif "already exists" in error_msg.lower():
+                error_msg = "Файл с таким ID уже существует."
 
             return {
                 "context": await cen.get(
                     "file_upload", error=f"Ошибка загрузки: {error_msg}"
                 )
             }
+
+        file = result.unwrap()
 
         return {
             "context": await cen.get(
@@ -583,7 +550,6 @@ async def handle_file_upload(
         }
 
     except Exception as e:
-        await file_service.delete_file(file.id)
         Logger.error(f"Error processing file upload: {e}")
         return {"context": await cen.get("file_upload", error=f"Ошибка обработки: {e}")}
 
