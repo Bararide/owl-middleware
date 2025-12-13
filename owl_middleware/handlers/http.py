@@ -294,10 +294,6 @@ async def upload_file_in_container(
     text_service: TextService,
     request: Request,
 ):
-    Logger.info("=" * 50)
-    Logger.info("UPLOAD FILE HANDLER CALLED")
-    Logger.info(f"Container ID from path: {container_id}")
-
     try:
         token = None
         auth_header = request.headers.get("Authorization")
@@ -364,19 +360,6 @@ async def upload_file_in_container(
                 detail=f"File too large. Maximum size: {max_file_size // 1024 // 1024}MB",
             )
 
-        Logger.info("1. Checking container limits...")
-        # limits_result = await container_service.check_container_limits(container_id)
-        # if limits_result.is_ok():
-        #     limits = limits_result.unwrap()
-        #     storage_used = limits["storage"]["used"]
-        #     storage_limit = limits["storage"]["limit"]
-
-        #     if storage_used + file_size > storage_limit:
-        #         raise HTTPException(
-        #             status_code=400,
-        #             detail=f"Storage quota exceeded. Available: {storage_limit - storage_used} bytes, file size: {file_size} bytes",
-        #         )
-
         file_data = {
             "id": f"http_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name}",
             "container_id": container_id,
@@ -387,20 +370,15 @@ async def upload_file_in_container(
             "mime_type": mime_type,
         }
 
-        Logger.info(2)
         db_result = await file_service.create_file(file_data)
         if db_result.is_err():
             error = db_result.unwrap_err()
-            Logger.error(f"Error creating file in DB: {error}")
             raise HTTPException(status_code=500, detail=f"Database error: {error}")
 
         file_entity = db_result.unwrap()
 
         try:
             binary_content = file_content
-            Logger.info(
-                f"File info: name={file_entity.name}, size={len(binary_content)} bytes, container={container.id}, mime_type={mime_type}"
-            )
 
             if mime_type == "application/pdf":
                 text_result = await text_service.extract_text_from_pdf(
@@ -417,8 +395,6 @@ async def upload_file_in_container(
                     )
 
                 extracted_text = text_result.unwrap()
-                Logger.info(f"Extracted {len(extracted_text)} characters from PDF")
-
                 if not extracted_text.strip():
                     await file_service.delete_file(file_entity.id)
                     raise HTTPException(
@@ -466,11 +442,6 @@ async def upload_file_in_container(
                 raise HTTPException(
                     status_code=500, detail=f"Upload error: {error_msg}"
                 )
-
-            Logger.info(
-                f"File uploaded successfully: {file_name} to container {container_id} by user {current_user.tg_id}"
-            )
-
             return {
                 "data": {
                     "success": True,
@@ -946,63 +917,42 @@ async def process_ocr(
             token = req.query_params.get("token")
 
         if not token:
-            Logger.error("No token provided for OCR")
             raise HTTPException(status_code=401, detail="Token required")
 
         user_result = await auth_service.get_user_by_token(token)
         if user_result.is_err():
-            Logger.error(f"Invalid token for OCR: {user_result.unwrap_err()}")
             raise HTTPException(status_code=401, detail="Invalid token")
 
         current_user = user_result.unwrap()
-        Logger.info(f"OCR request from user: {current_user.tg_id}")
 
         container_id = request.get("container_id")
         file_data_base64 = request.get("file_data")
         file_name = request.get("file_name")
         mime_type = request.get("mime_type", "image/jpeg")
 
-        Logger.info(f"Container ID: {container_id}")
-        Logger.info(f"File name: {file_name}")
-        Logger.info(f"MIME type: {mime_type}")
-        Logger.info(
-            f"File data length: {len(file_data_base64) if file_data_base64 else 0}"
-        )
-
         if not container_id:
-            Logger.error("Container ID is missing")
             raise HTTPException(status_code=400, detail="Container ID is required")
 
         if not file_data_base64:
-            Logger.error("File data is missing")
             raise HTTPException(status_code=400, detail="File data is required")
 
         if not file_name:
-            Logger.error("File name is missing")
             raise HTTPException(status_code=400, detail="File name is required")
 
         container_result = await container_service.get_container(container_id)
         if container_result.is_err() or not container_result.unwrap():
-            Logger.error(f"Container not found: {container_id}")
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
         if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
-            Logger.error(
-                f"Access denied for user {current_user.tg_id} to container {container_id}"
-            )
             raise HTTPException(status_code=403, detail="Access denied")
 
         try:
             file_data = base64.b64decode(file_data_base64)
         except Exception as e:
-            Logger.error(f"Failed to decode base64 file data: {e}")
             raise HTTPException(status_code=400, detail="Invalid file data encoding")
 
-        Logger.info(f"File decoded: {file_name}, size: {len(file_data)} bytes")
-
         if len(file_data) == 0:
-            Logger.error("Empty file received")
             raise HTTPException(status_code=400, detail="Empty file")
 
         supported_formats = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".pdf"]
@@ -1012,10 +962,6 @@ async def process_ocr(
                 status_code=400,
                 detail="Unsupported file format. Only images and PDF are supported",
             )
-
-        Logger.info(
-            f"OCR processing for user {current_user.tg_id}, file: {file_name}, size: {len(file_data)} bytes"
-        )
 
         ocr_result = await ocr_service.extract_from_bytes(file_data, file_name)
 
@@ -1027,10 +973,8 @@ async def process_ocr(
             )
 
         extracted_text = ocr_result.unwrap()
-        Logger.info(f"OCR completed, extracted {len(extracted_text)} characters")
 
         cleaned_text = ocr_service.clean_html_tags(extracted_text)
-        Logger.info(f"After cleaning: {len(cleaned_text)} characters")
 
         visualized_data = None
         boxes_count = 0
@@ -1044,11 +988,7 @@ async def process_ocr(
                 )
                 boxes = ocr_service.parse_bounding_boxes(extracted_text)
                 boxes_count = len(boxes)
-                Logger.info(
-                    f"Generated visualization with {boxes_count} bounding boxes"
-                )
             except Exception as e:
-                Logger.warning(f"Could not generate visualization: {e}")
                 visualized_data = None
 
         result_file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name.split('.')[0]}.txt"
@@ -1081,19 +1021,9 @@ async def process_ocr(
             )
             response_data["visualization_format"] = "image/jpeg"
 
-        Logger.info(
-            f"OCR processing completed successfully for user {current_user.tg_id}"
-        )
-
         return {"data": response_data}
 
-    except HTTPException:
-        raise
     except Exception as e:
-        Logger.error(f"Unexpected error in OCR processing: {e}")
-        import traceback
-
-        Logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -1279,15 +1209,12 @@ async def semantic_search(
         token = auth_header[7:]
     else:
         token = req.query_params.get("token")
-        Logger.error(f"Query token: {req.query_params.get('token')}")
 
     if not token:
-        Logger.error("No token provided")
         raise HTTPException(status_code=401, detail="Token required")
 
     user_result = await auth_service.get_user_by_token(token)
     if user_result.is_err():
-        Logger.error(f"Invalid token: {user_result.unwrap_err()}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
     current_user = user_result.unwrap()
@@ -1307,9 +1234,6 @@ async def semantic_search(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    # if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
-    #     raise HTTPException(status_code=403, detail="Access denied")
-
     search_result = await api_service.semantic_search(
         query,
         current_user,
