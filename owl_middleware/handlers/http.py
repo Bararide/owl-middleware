@@ -1096,7 +1096,7 @@ async def chat_with_bot(
     context_parts = []
     used_files = []
 
-    for file_info in search_data.get("results", []):
+    for file_info in reversed(search_data.get("results", [])):
         file_path = file_info.get("path", "")
 
         file_id = file_path.split("/")[-1] if "/" in file_path else file_path

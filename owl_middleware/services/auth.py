@@ -128,7 +128,7 @@ class AuthService:
     async def get_user_by_token(self, token: str) -> Result[User, Exception]:
         payload_result = self.verify_jwt_token(token)
         if payload_result.is_err():
-            return Result.Err(payload_result.unwrap_err())
+            return Result.err(payload_result.unwrap_err())
 
         payload = payload_result.unwrap()
         return await self.get_user(payload["user_id"])
