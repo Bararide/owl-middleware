@@ -155,7 +155,15 @@ class ApiService:
                         if "data" in data:
                             files_data = data["data"]
                             if "files" in files_data:
+                                Logger.info(f"Files data: {files_data}")
                                 return Ok(files_data["files"])
+                            elif "paths" in files_data:
+                                paths = files_data["paths"]
+                                files_list = [
+                                    {"path": path, "name": os.path.basename(path)}
+                                    for path in paths
+                                ]
+                                return Ok(files_list)
                             else:
                                 return Ok([])
                         else:
