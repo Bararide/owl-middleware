@@ -2761,6 +2761,24 @@ files = [
 requests = ">=2.0.1,<3.0.0"
 
 [[package]]
+name = "returns"
+version = "0.26.0"
+description = "Make your functions return something meaningful, typed, and safe!"
+optional = false
+python-versions = "<4.0,>=3.10"
+files = [
+    {file = "returns-0.26.0-py3-none-any.whl", hash = "sha256:7cae94c730d6c56ffd9d0f583f7a2c0b32cfe17d141837150c8e6cff3eb30d71"},
+    {file = "returns-0.26.0.tar.gz", hash = "sha256:180320e0f6e9ea9845330ccfc020f542330f05b7250941d9b9b7c00203fcc3da"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.0,<5.0"
+
+[package.extras]
+check-laws = ["hypothesis (>=6.136,<7.0)", "pytest (>=8.0,<9.0)"]
+compatible-mypy = ["mypy (>=1.12,<1.18)"]
+
+[[package]]
 name = "ruff"
 version = "0.13.3"
 description = "An extremely fast Python linter and code formatter, written in Rust."
@@ -3549,4 +3567,4 @@ cffi = ["cffi (>=1.17,<2.0)", "cffi (>=2.0.0b)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "dc596aec2287001f9142e528df51ed1bd4b485b76ee8029360d8536a3d930087"
+content-hash = "a87a96a99bbe2b8dcb90bc2fa3b3bba59ff0a76d31ddf8fa33799327fbe6563d"
