@@ -78,7 +78,7 @@ async def handle_read_file_callback(
                 )
             }
 
-        content_result = await api_service.get_file_content(
+        content_result = await api_service.files.get_file_content(
             str(file_id), str(container_id)
         )
 
@@ -283,7 +283,7 @@ async def callback_ocr_file_filter(
 
         file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
-        result = await api_service.create_file(
+        result = await api_service.files.create_file(
             path=file_name,
             content=ocr_data["text"],
             user_id=str(user.id),

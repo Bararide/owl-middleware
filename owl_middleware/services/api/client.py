@@ -81,31 +81,10 @@ class ApiClient:
         params: Optional[Dict] = None,
         headers: Optional[Dict] = None,
     ) -> Result[Any, Exception]:
-        return (
-            await (await self._ensure_connection())
-            .and_then_async(
-                lambda _: self._execute_request(
-                    method, endpoint, json_data, params, headers
-                )
-            )
-            .and_then_async(self._process_response)
-        )
-
-    @result_try
-    async def _ensure_connection(self) -> Result[None, Exception]:
-        """Гарантирует наличие соединения"""
         connect_result = await self.connect()
-        return connect_result.map(lambda _: None)
+        if connect_result.is_err():
+            return connect_result
 
-    @result_try
-    async def _execute_request(
-        self,
-        method: str,
-        endpoint: str,
-        json_data: Optional[Dict],
-        params: Optional[Dict],
-        headers: Optional[Dict],
-    ) -> Result[aiohttp.ClientResponse, Exception]:
         default_headers = {"Content-Type": "application/json"}
         if headers:
             default_headers.update(headers)
@@ -118,16 +97,17 @@ class ApiClient:
                 params=params,
                 headers=default_headers,
             ) as response:
-                return Ok(response)
+                response_text = await response.text()
+
+                parse_result = self._parse_response(response_text, response.status)
+                if parse_result.is_err():
+                    return parse_result
+
+                return self._extract_data(parse_result.unwrap())
+
         except aiohttp.ClientError as e:
             Logger.error(f"HTTP client error: {e}")
             return Err(e)
-
-    async def _process_response(
-        self, response: aiohttp.ClientResponse
-    ) -> Result[Any, Exception]:
-        response_text = await response.text()
-
-        return self._parse_response(response_text, response.status).and_then(
-            self._extract_data
-        )
+        except Exception as e:
+            Logger.error(f"Unexpected error in _make_request: {e}")
+            return Err(e)

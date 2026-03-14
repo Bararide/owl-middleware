@@ -241,7 +241,7 @@ async def get_file_content(
             )
             raise HTTPException(status_code=403, detail="Access denied")
 
-        content_result = await api_service.get_file_content(
+        content_result = await api_service.files.get_file_content(
             str(file_id), str(container_id)
         )
 
@@ -525,7 +525,7 @@ async def delete_file_in_container(
 @http_router.get("/health")
 @inject("api_service")
 async def check_health(request: Request, api_service: ApiService):
-    health_check_result = await api_service.health_check()
+    health_check_result = await api_service.system.health_check()
 
     if health_check_result.is_err():
         raise HTTPException(status_code=500, detail="Health check failed")
@@ -569,8 +569,10 @@ async def list_files_and_rebuild(
     if container_result.is_err() or not container_result.unwrap():
         raise HTTPException(status_code=404, detail="Container not found")
 
-    files_api_result = await api_service.get_files_by_container_id_and_rebuild_index(
-        current_user.id, container_id
+    files_api_result = (
+        await api_service.containers.get_files_by_container_id_and_rebuild_index(
+            current_user.id, container_id
+        )
     )
 
     if files_api_result.is_err():
@@ -655,7 +657,7 @@ async def list_files(
     if container_result.is_err() or not container_result.unwrap():
         raise HTTPException(status_code=404, detail="Container not found")
 
-    files_api_result = await api_service.get_files_by_container_id(
+    files_api_result = await api_service.containers.get_files_by_container_id(
         current_user.id, container_id
     )
 
@@ -1079,7 +1081,7 @@ async def chat_with_bot(
 
     container = container_result.unwrap()
 
-    search_result = await api_service.semantic_search(
+    search_result = await api_service.containers.semantic_search(
         query,
         current_user,
         container,
@@ -1101,7 +1103,7 @@ async def chat_with_bot(
 
         file_id = file_path.split("/")[-1] if "/" in file_path else file_path
 
-        content_result = await api_service.get_file_content(file_id, container_id)
+        content_result = await api_service.files.get_file_content(file_id, container_id)
 
         content_snippet = ""
         if content_result.is_ok():
@@ -1234,7 +1236,7 @@ async def semantic_search(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    search_result = await api_service.semantic_search(
+    search_result = await api_service.containers.semantic_search(
         query,
         current_user,
         container,

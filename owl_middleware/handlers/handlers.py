@@ -131,7 +131,7 @@ async def handle_download_file(
 
         Logger.info(f"Downloading file: {file_id} from container: {container_id}")
 
-        content_result = await api_service.get_file_content(
+        content_result = await api_service.files.get_file_content(
             str(file_id), str(container_id)
         )
 
@@ -342,7 +342,7 @@ async def handle_create_container(
 
         container = db_result.unwrap()
 
-        api_result = await api_service.create_container(
+        api_result = await api_service.containers.create_container(
             user_id=str(user.tg_id),
             container_id=container_id,
             tariff=container.tariff,
@@ -595,7 +595,7 @@ async def handle_search(
 
     container = container_result.unwrap()
 
-    search_result = await api_service.semantic_search(
+    search_result = await api_service.containers.semantic_search(
         query,
         user,
         container,
@@ -820,7 +820,7 @@ async def handle_read_file(
 
     Logger.error(f"READ HANDLER {path}")
 
-    read_result = await api_service.read_file(path)
+    read_result = await api_service.files.read_file(path)
 
     if read_result.is_err():
         error = read_result.unwrap_err()
@@ -863,7 +863,9 @@ async def handle_read_file_impl(
     file_id = args[0]
     container_id = state_service.get_work_container(str(user.tg_id))
 
-    content_result = await api_service.get_file_content(str(file_id), str(container_id))
+    content_result = await api_service.files.get_file_content(
+        str(file_id), str(container_id)
+    )
 
     if content_result.is_err():
         error = content_result.unwrap_err()
@@ -982,7 +984,7 @@ async def handle_rebuild_index(
             "context": await cen.get("rebuild_index", error="Insufficient permissions")
         }
 
-    rebuild_result = await api_service.rebuild_index()
+    rebuild_result = await api_service.containers.rebuild_index()
 
     if rebuild_result.is_err():
         error = rebuild_result.unwrap_err()
@@ -1011,7 +1013,7 @@ async def handle_health_check(
     api_service: ApiService,
     cen: ContextEngine,
 ):
-    health_result = await api_service.health_check()
+    health_result = await api_service.system.health_check()
 
     if health_result.is_err():
         error = health_result.unwrap_err()
@@ -1061,7 +1063,7 @@ async def handle_list_files(
     files_info = []
     for file in files:
         path = f"/{file.id}_{file.name}"
-        read_result = await api_service.read_file(path)
+        read_result = await api_service.files.read_file(path)
 
         if read_result.is_ok():
             file_data = read_result.unwrap()
@@ -1148,8 +1150,8 @@ async def handle_service_status(
     if not user.is_admin:
         return await message.answer("❌ Insufficient permissions")
 
-    health_result = await api_service.health_check()
-    root_result = await api_service.get_root()
+    health_result = await api_service.system.health_check()
+    root_result = await api_service.system.get_root()
 
     status_text = "<b>C++ Service Status</b>\n\n"
 
