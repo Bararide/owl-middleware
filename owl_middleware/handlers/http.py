@@ -1244,9 +1244,12 @@ async def semantic_search(
     )
 
     if search_result.is_err():
+        Logger.error(f"SEMANTIC SEARCH ERROR: {search_result.unwrap_err()}")
         raise HTTPException(
             status_code=500, detail=f"Search error: {search_result.unwrap_err()}"
         )
+
+    Logger.info(f"DATA: {search_result.unwrap()}")
 
     return {"data": search_result.unwrap()}
 
