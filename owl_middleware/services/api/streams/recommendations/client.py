@@ -48,22 +48,21 @@ class SSEClient:
                     Logger.error(f"Error in SSE handler for {event}: {e}")
 
     async def connect(self, headers: Optional[Dict] = None) -> Result[bool, Exception]:
-        """Подключение к SSE потоку"""
         try:
             async with self.session.get(self.url, headers=headers) as response:
                 if response.status != 200:
                     return Err(Exception(f"Failed to connect: {response.status}"))
 
+                Logger.info(f"SSE connected to {self.url}")
+                Logger.info(f"CONTENT: {response.content}")
+
                 self.running = True
 
                 async for line in response.content:
-                    if not self.running:
-                        break
-
-                    line = line.decode("utf-8").strip()
+                    line = line.decode("utf-8").rstrip("\n")
 
                     if line.startswith("data:"):
-                        data_str = line[5:].strip()
+                        data_str = line[5:].lstrip()
                         try:
                             data = json.loads(data_str)
                             self._emit("message", data)
@@ -71,7 +70,7 @@ class SSEClient:
                             self._emit("message", data_str)
 
                     elif line.startswith("event:"):
-                        event_name = line[6:].strip()
+                        event_name = line[6:].lstrip()
                         if event_name == "end":
                             self._emit("end")
                             break

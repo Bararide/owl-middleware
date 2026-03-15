@@ -1,4 +1,5 @@
 from typing import Optional, Callable, Dict, Any, List
+import uuid
 from fastbot.logger.logger import Logger
 
 from .client import SSEClient
@@ -25,9 +26,11 @@ class RecommendationStream:
             user_id = data.get("user_id", "")
             paths = data.get("paths", [])
 
-            if paths:
-                Logger.info(f"Received {len(paths)} paths for container {container_id}")
+            Logger.info(
+                f"Received {len(paths)} paths for container {container_id}, user_id {user_id}"
+            )
 
+            if paths:
                 for handler in self._paths_handlers:
                     try:
                         handler(container_id, user_id, paths)
@@ -59,6 +62,8 @@ class RecommendationStream:
 
         self.client = SSEClient(url_with_params)
 
+        Logger.info("CONNECT TO STREAM")
+
         self.client.on_data(self._handle_data)
         self.client.on_end(self._handle_end)
 
@@ -74,22 +79,43 @@ class RecommendationStream:
 class RecommendationStreamManager:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        self.streams: Dict[str, RecommendationStream] = {}
+        self.stream: Optional[RecommendationStream] = None
+        self.listeners: Dict[str, List[Callable]] = {}
+        self.user_container_key: Optional[str] = None
 
-    async def create_stream(
-        self, stream_id: str, user_id: str, container_id: str
-    ) -> RecommendationStream:
-        stream = RecommendationStream(self.base_url)
-        await stream.connect(user_id, container_id)
-        self.streams[stream_id] = stream
-        return stream
+    async def subscribe(
+        self, user_id: str, container_id: str, on_paths: Callable, on_complete: Callable
+    ):
+        key = f"{user_id}_{container_id}"
 
-    async def close_stream(self, stream_id: str):
-        if stream_id in self.streams:
-            await self.streams[stream_id].close()
-            del self.streams[stream_id]
+        if self.user_container_key != key:
+            if self.stream:
+                await self.stream.close()
 
-    async def close_all(self):
-        for stream in self.streams.values():
-            await stream.close()
-        self.streams.clear()
+            self.stream = RecommendationStream(self.base_url)
+            await self.stream.connect(user_id, container_id)
+            self.user_container_key = key
+
+            self.stream.on_paths(self._broadcast_paths)
+            self.stream.on_complete(self._broadcast_complete)
+
+        listener_id = str(uuid.uuid4())
+        self.listeners[listener_id] = {"on_paths": on_paths, "on_complete": on_complete}
+        return listener_id
+
+    def _broadcast_paths(self, container_id: str, user_id: str, paths: List[str]):
+        """Шлем всем подписанным клиентам"""
+        for listener in self.listeners.values():
+            try:
+                listener["on_paths"](container_id, user_id, paths)
+            except:
+                pass
+
+    def _broadcast_complete(self):
+        """Шлем всем завершение"""
+        for listener in self.listeners.values():
+            try:
+                listener["on_complete"]()
+            except:
+                pass
+        self.listeners.clear()

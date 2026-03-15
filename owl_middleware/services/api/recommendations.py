@@ -7,8 +7,6 @@ from .streams.recommendations.recommendations import RecommendationStreamManager
 
 
 class RecommendationHandler:
-    """Обработчик для работы с рекомендациями"""
-
     def __init__(self, client: ApiClient, base_url: str):
         self.client = client
         self.stream_manager = RecommendationStreamManager(base_url)
@@ -21,32 +19,21 @@ class RecommendationHandler:
         on_paths: Optional[callable] = None,
         on_complete: Optional[callable] = None,
     ) -> Result[str, Exception]:
-        """Получение потока рекомендаций"""
-        stream_id = f"{user_id}_{container_id}"
-
-        stream = await self.stream_manager.create_stream(
-            stream_id, user_id, container_id
+        stream_id = await self.stream_manager.subscribe(
+            user_id, container_id, on_paths, on_complete
         )
-
-        if on_paths:
-            stream.on_paths(on_paths)
-
-        if on_complete:
-            stream.on_complete(on_complete)
-
         return Ok(stream_id)
 
     @result_try
     async def close_stream(self, stream_id: str) -> Result[bool, Exception]:
-        """Закрытие потока рекомендаций"""
-        await self.stream_manager.close_stream(stream_id)
+        if stream_id in self.stream_manager.listeners:
+            del self.stream_manager.listeners[stream_id]
         return Ok(True)
 
     @result_try
     async def get_recommendations_blocking(
         self, user_id: str, container_id: str, timeout: int = 30
     ) -> Result[List[str], Exception]:
-        """Блокирующее получение рекомендаций (ждет завершения потока)"""
         result_paths = []
         completed = asyncio.Event()
 
@@ -56,11 +43,9 @@ class RecommendationHandler:
         def on_complete():
             completed.set()
 
-        stream_id = f"{user_id}_{container_id}_blocking"
-        stream = await self.stream_manager.create_stream(
-            stream_id, user_id, container_id
+        stream_id = await self.stream_manager.subscribe(
+            user_id, container_id, on_paths, on_complete
         )
-        stream.on_paths(on_paths).on_complete(on_complete)
 
         try:
             await asyncio.wait_for(completed.wait(), timeout=timeout)
@@ -68,4 +53,5 @@ class RecommendationHandler:
         except asyncio.TimeoutError:
             return Err(Exception(f"Timeout after {timeout} seconds"))
         finally:
-            await self.stream_manager.close_stream(stream_id)
+            if stream_id in self.stream_manager.listeners:
+                del self.stream_manager.listeners[stream_id]
