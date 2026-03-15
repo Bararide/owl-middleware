@@ -36,7 +36,9 @@ class FileService:
 
         file = create_db_result.unwrap()
 
-        create_api_result = await self.api_service.create_file_from_model(file, content)
+        create_api_result = await self.api_service.files.create_file_from_model(
+            file, content
+        )
         if create_api_result.is_err():
             await self.delete_file(file.id)
             return create_api_result

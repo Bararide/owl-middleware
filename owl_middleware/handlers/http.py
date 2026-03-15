@@ -267,8 +267,10 @@ async def get_file_content(
         }
 
         Logger.info(
-            f"File content retrieved successfully: {file_id} from container {container_id}"
+            f"File content retrieved successfully: {file_id} from container {container_id}, content {content}"
         )
+
+        Logger.info(f"Returning response data: {response_data}")
 
         return {"data": response_data}
 
@@ -402,7 +404,7 @@ async def upload_file_in_container(
                         detail="Could not extract text from PDF file. The file may be scanned or protected.",
                     )
 
-                api_result = await api_service.create_file(
+                api_result = await api_service.files.create_file(
                     path=file_entity.id,
                     content=extracted_text,
                     user_id=str(current_user.id),
@@ -411,7 +413,7 @@ async def upload_file_in_container(
 
             elif mime_type and mime_type.startswith("text/"):
                 content_text = binary_content.decode("utf-8", errors="ignore")
-                api_result = await api_service.create_file(
+                api_result = await api_service.files.create_file(
                     path=file_entity.id,
                     content=content_text,
                     user_id=str(current_user.id),
@@ -419,7 +421,7 @@ async def upload_file_in_container(
                 )
             else:
                 content_base64 = base64.b64encode(binary_content).decode("ascii")
-                api_result = await api_service.create_file(
+                api_result = await api_service.files.create_file(
                     path=file_entity.id,
                     content=content_base64,
                     user_id=str(current_user.id),
@@ -995,7 +997,7 @@ async def process_ocr(
 
         result_file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name.split('.')[0]}.txt"
 
-        api_result = await api_service.create_file(
+        api_result = await api_service.files.create_file(
             path=result_file_name,
             content=cleaned_text,
             user_id=str(current_user.id),
