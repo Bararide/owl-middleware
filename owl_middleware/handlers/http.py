@@ -1373,6 +1373,7 @@ async def recommendations_stream(
                 on_paths=on_paths,
                 on_complete=on_complete,
             )
+
             if result.is_err():
                 error_msg = (
                     f"Failed to create recommendation stream: {result.unwrap_err()}"
@@ -1380,9 +1381,12 @@ async def recommendations_stream(
                 Logger.error(error_msg)
                 yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
                 return
+
             stream_id = result.unwrap()
             Logger.info(f"Recommendation stream created: {stream_id}")
+
             yield f"event: connected\ndata: {json.dumps({'stream_id': stream_id, 'container_id': container_id})}\n\n"
+
             while True:
                 try:
                     event_type, data = await asyncio.wait_for(queue.get(), timeout=60)
@@ -1395,13 +1399,12 @@ async def recommendations_stream(
                 except asyncio.TimeoutError:
                     yield f": heartbeat\n\n"
                     continue
+
         except Exception as e:
             Logger.error(f"Error in recommendations stream: {e}")
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
-        finally:
-            if stream_id:
-                await api_service.recommendations.close_stream(stream_id)
-                Logger.info(f"Recommendation stream closed: {stream_id}")
+
+    origin = request.headers.get("origin", "http://localhost:3001")
 
     response = StreamingResponse(
         event_generator(),
@@ -1410,29 +1413,24 @@ async def recommendations_stream(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
         },
     )
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = (
-            "Authorization, Content-Type, Accept"
-        )
+
     return response
 
 
 @http_router.options("/recommendations/stream")
 async def recommendations_stream_options(request: Request):
-    """Обработка OPTIONS запроса для CORS"""
-    origin = request.headers.get("origin", "")
-    headers = {}
-    if origin:
-        headers = {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
-            "Access-Control-Max-Age": "3600",
-        }
+    origin = request.headers.get("origin", "http://localhost:3001")
+    headers = {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+        "Access-Control-Max-Age": "3600",
+    }
     return JSONResponse(content={}, headers=headers)
