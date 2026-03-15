@@ -270,8 +270,6 @@ async def get_file_content(
             f"File content retrieved successfully: {file_id} from container {container_id}, content {content}"
         )
 
-        Logger.info(f"Returning response data: {response_data}")
-
         return {"data": response_data}
 
     except HTTPException:
