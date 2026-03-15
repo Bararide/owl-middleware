@@ -42,9 +42,6 @@ class FileHandler:
             "container_id": container_id,
         }
 
-        Logger.info(f"Raw response for file create: {payload}")
-        Logger.info(f"File content size: {len(content)} bytes")
-
         return await self.client._make_request(
             "POST", "/files/create", json_data=payload
         )
