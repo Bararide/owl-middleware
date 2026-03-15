@@ -1,6 +1,12 @@
+import asyncio
 import base64
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+import json
+
+from typing import List
+from fastapi import APIRouter, HTTPException, Request
 from datetime import datetime
+
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from fastbot.decorators import inject
 from fastbot.logger import Logger
@@ -265,10 +271,6 @@ async def get_file_content(
             "size": len(content),
             "mime_type": file_metadata.mime_type if file_metadata else "text/plain",
         }
-
-        Logger.info(
-            f"File content retrieved successfully: {file_id} from container {container_id}, content {content}"
-        )
 
         return {"data": response_data}
 
@@ -1293,3 +1295,161 @@ async def delete_container(
         raise HTTPException(status_code=500, detail="Error deleting container")
 
     return {"message": "Container deleted successfully"}
+
+
+@http_router.get("/recommendations/stream")
+@inject("auth_service")
+@inject("container_service")
+@inject("api_service")
+async def recommendations_stream(
+    request: Request,
+    auth_service: AuthService,
+    container_service: ContainerService,
+    api_service: ApiService,
+):
+    Logger.info("RECOMMENDATIONS STREAM")
+
+    origin = request.headers.get("origin", "")
+
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.query_params.get("token")
+
+    if not token:
+        Logger.error("No token provided for recommendations stream")
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        Logger.error(
+            f"Invalid token for recommendations stream: {user_result.unwrap_err()}"
+        )
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    container_id = request.query_params.get("container_id")
+    if not container_id:
+        raise HTTPException(status_code=400, detail="container_id is required")
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    container = container_result.unwrap()
+    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    async def event_generator():
+        stream_id = None
+        sent_paths = set()
+
+        try:
+            queue = asyncio.Queue()
+
+            def on_paths(container_id: str, user_id: str, paths: List[str]):
+                new_paths = [p for p in paths if p not in sent_paths]
+                if new_paths:
+                    sent_paths.update(new_paths)
+                    event_data = {
+                        "container_id": container_id,
+                        "user_id": user_id,
+                        "paths": new_paths,
+                        "total_paths": list(sent_paths),
+                        "type": "paths_update",
+                    }
+                    asyncio.create_task(queue.put(("data", event_data)))
+
+            Logger.error(f"PATHS: {list(sent_paths)}")
+
+            def on_complete():
+                final_data = {
+                    "container_id": container_id,
+                    "user_id": str(current_user.id),
+                    "paths": list(sent_paths),
+                    "type": "complete",
+                    "count": len(sent_paths),
+                }
+                asyncio.create_task(queue.put(("data", final_data)))
+                asyncio.create_task(queue.put(("event", "end")))
+
+            result = await api_service.recommendations.get_recommendations_stream(
+                user_id=str(current_user.id),
+                container_id=container_id,
+                on_paths=on_paths,
+                on_complete=on_complete,
+            )
+
+            if result.is_err():
+                error_msg = (
+                    f"Failed to create recommendation stream: {result.unwrap_err()}"
+                )
+                Logger.error(error_msg)
+                yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
+                return
+
+            stream_id = result.unwrap()
+            Logger.info(f"Recommendation stream created: {stream_id}")
+
+            yield f"event: connected\ndata: {json.dumps({'stream_id': stream_id, 'container_id': container_id})}\n\n"
+
+            while True:
+                try:
+                    event_type, data = await asyncio.wait_for(queue.get(), timeout=60)
+
+                    if event_type == "data":
+                        yield f"data: {json.dumps(data)}\n\n"
+                    elif event_type == "event" and data == "end":
+                        yield f"event: end\n\n"
+                        break
+
+                except asyncio.TimeoutError:
+                    yield f": heartbeat\n\n"
+                    continue
+
+        except Exception as e:
+            Logger.error(f"Error in recommendations stream: {e}")
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            if stream_id:
+                await api_service.recommendations.close_stream(stream_id)
+                Logger.info(f"Recommendation stream closed: {stream_id}")
+
+    response = StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Authorization, Content-Type, Accept"
+        )
+
+    return response
+
+
+@http_router.options("/recommendations/stream")
+async def recommendations_stream_options(request: Request):
+    """Обработка OPTIONS запроса для CORS"""
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+            "Access-Control-Max-Age": "3600",
+        }
+    return JSONResponse(content={}, headers=headers)
