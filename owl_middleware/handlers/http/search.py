@@ -98,7 +98,9 @@ async def get_semantic_graph(
 
     container = container_result.unwrap()
 
-    maybe_graph = api_service.containers.get_semantic_graph(current_user, container)
+    maybe_graph = await api_service.containers.get_semantic_graph(
+        current_user, container
+    )
     if maybe_graph.is_err():
         logger.error(f"ERROR IN GET SEMANTIC GRAPH {maybe_graph.unwrap_err()}")
         raise HTTPException(
