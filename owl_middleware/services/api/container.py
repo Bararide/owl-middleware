@@ -2,7 +2,7 @@ import os
 from typing import List, Dict, Any
 from fastbot.core import Result, result_try, Ok
 from fastbot.logger.logger import Logger
-from models import Tariff, Label, User, Container
+from models import Tariff, Label, User, Container, SemanticEdge
 
 from .client import ApiClient
 
@@ -129,4 +129,21 @@ class ContainerHandler:
 
         return await self.client._make_request(
             "POST", "/containers/semantic", json_data=payload
+        )
+
+    @result_try
+    async def get_semantic_graph(
+        self, user: User, container: Container
+    ) -> Result[List[SemanticEdge], Exception]:
+        Logger.info(container.id)
+
+        payload = {
+            "user_id": str(user.id),
+            "container_id": str(container.id),
+        }
+
+        return await self.client._make_request(
+            "GET",
+            "/containers/semantic/graph",
+            params=payload,
         )

@@ -1256,6 +1256,56 @@ async def semantic_search(
     return {"data": search_result.unwrap()}
 
 
+@http_router.get("/semantic/graph")
+@inject("container_service")
+@inject("auth_service")
+@inject("api_service")
+async def get_semantic_graph(
+    request: dict,
+    req: Request,
+    api_service: ApiService,
+    container_service: ContainerService,
+    auth_service: AuthService,
+):
+    token = None
+    auth_header = req.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = req.query_params.get("token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    user_result = await auth_service.get_user_by_token(token)
+    if user_result.is_err():
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_user = user_result.unwrap()
+
+    container_id = request.get("container_id")
+
+    if not container_id:
+        raise HTTPException(status_code=400, detail="Container ID is required")
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    container = container_result.unwrap()
+
+    maybe_graph = api_service.containers.get_semantic_graph(current_user, container)
+
+    if maybe_graph.is_err():
+        Logger.error(f"ERROR IN GET SEMANTIC GRAPH {maybe_graph.unwrap_err()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"get semantic graph error: {maybe_graph.unwrap_err()}",
+        )
+
+    return {"data": maybe_graph.unwrap()}
+
+
 @http_router.delete("/containers/{container_id}")
 @inject("container_service")
 @inject("auth_service")
