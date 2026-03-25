@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastbot.decorators import inject
+from fastbot.logger.logger import Logger
 from services import ApiService, ContainerService, AuthService
 from models import User
 import logging
@@ -107,5 +108,7 @@ async def get_semantic_graph(
             status_code=500,
             detail=f"get semantic graph error: {maybe_graph.unwrap_err()}",
         )
+
+    Logger.info(f"{maybe_graph.unwrap()}")
 
     return {"data": maybe_graph.unwrap()}

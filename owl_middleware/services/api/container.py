@@ -143,7 +143,7 @@ class ContainerHandler:
         }
 
         return await self.client._make_request(
-            "GET",
-            "/containers/semantic/graph",
-            params=payload,
+            "POST",
+            "/container/semantic/graph",
+            json_data=payload,
         )
