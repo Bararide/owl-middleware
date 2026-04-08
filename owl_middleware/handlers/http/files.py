@@ -199,21 +199,24 @@ async def get_file_content(
             detail=f"Error reading file content: {content_result.unwrap_err()}",
         )
 
-    content = content_result.unwrap()
+    content, explanation = content_result.unwrap()
 
     file_service_result = await file_service.get_file(file_id)
     file_metadata = (
         file_service_result.unwrap() if file_service_result.is_ok() else None
     )
 
-    return {
-        "data": {
-            "content": content,
-            "encoding": "utf-8",
-            "size": len(content),
-            "mime_type": file_metadata.mime_type if file_metadata else "text/plain",
-        }
+    response_data = {
+        "content": content,
+        "encoding": "utf-8",
+        "size": len(content),
+        "mime_type": file_metadata.mime_type if file_metadata else "text/plain",
     }
+
+    if explanation:
+        response_data["explanation"] = explanation
+
+    return {"data": response_data}
 
 
 @router.delete("/{file_id}")

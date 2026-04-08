@@ -144,7 +144,7 @@ async def handle_download_file(
                 )
             }
 
-        content = content_result.unwrap()
+        content, _ = content_result.unwrap()
 
         if not content:
             return {
@@ -874,7 +874,7 @@ async def handle_read_file_impl(
             "context": await cen.get("read_file", error=f"Ошибка чтения файла: {error}")
         }
 
-    content = content_result.unwrap()
+    content, _ = content_result.unwrap()
 
     def is_base64_encoded(s):
         try:

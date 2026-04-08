@@ -54,7 +54,7 @@ class FileHandler:
     @result_try
     async def get_file_content(
         self, file_id: str, container_id: str
-    ) -> Result[str, Exception]:
+    ) -> Result[tuple[str, str | None], Exception]:
         payload = {"file_id": str(file_id), "container_id": str(container_id)}
 
         result = await self.client._make_request(
@@ -63,28 +63,24 @@ class FileHandler:
 
         if result.is_ok():
             data = result.unwrap()
+            content = ""
+            explanation = None
 
             if isinstance(data, dict):
                 if "data" in data:
                     content_data = data["data"]
                     if isinstance(content_data, dict):
-                        if "content" in content_data:
-                            return Ok(str(content_data["content"]))
-                        elif "text" in content_data:
-                            return Ok(str(content_data["text"]))
-                        else:
-                            return Ok(str(content_data))
+                        content = str(content_data.get("content", ""))
+                        explanation = str(content_data.get("explanation"))
                     else:
-                        return Ok(str(content_data))
+                        content = str(content_data)
                 else:
-                    if "content" in data:
-                        return Ok(str(data["content"]))
-                    elif "text" in data:
-                        return Ok(str(data["text"]))
-                    else:
-                        return Ok(str(data))
+                    content = str(data.get("content", ""))
+                    explanation = str(data.get("explanation"))
             else:
-                return Ok(str(data))
+                content = str(data)
+
+            return Ok((content, explanation))
 
         return result
 

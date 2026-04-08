@@ -65,7 +65,7 @@ async def chat_with_bot(
         content_result = await api_service.files.get_file_content(file_id, container_id)
         content_snippet = ""
         if content_result.is_ok():
-            content_data = content_result.unwrap()
+            content_data, _ = content_result.unwrap()
             if isinstance(content_data, str):
                 content_snippet = content_data
             elif isinstance(content_data, dict) and "content" in content_data:
