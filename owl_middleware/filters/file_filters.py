@@ -34,6 +34,16 @@ async def handle_read_file_callback(
 
         callback_data = callback.data
 
+        if isinstance(callback_data, tuple):
+            callback_data = callback_data[0] if callback_data else ""
+
+        if not isinstance(callback_data, str):
+            return {
+                "context": await cen.get(
+                    "read_file", error="Неверный формат callback_data"
+                )
+            }
+
         if not callback_data.startswith("file_"):
             return {
                 "context": await cen.get(
@@ -91,7 +101,7 @@ async def handle_read_file_callback(
                 )
             }
 
-        content = content_result.unwrap()
+        content, _ = content_result.unwrap()
 
         def is_base64_encoded(s):
             try:
