@@ -30,8 +30,15 @@ class ContainerService:
         self, user_id: str
     ) -> Result[List[Container], Exception]:
         containers = await self.containers.find({"user_id": user_id}).to_list(None)
-        Logger.debug([Container(**container) for container in containers])
+        # Logger.debug([Container(**container) for container in containers])
         return Ok([Container(**container) for container in containers])
+
+    @result_try
+    async def get_container_metrics(
+        self, container_id: str
+    ) -> Result[Dict[str, Any], Exception]:
+        # metrics = await self.api_service.get_container_metrics(container_id)
+        return {}
 
     @result_try
     async def create_container(

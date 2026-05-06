@@ -147,3 +147,29 @@ class ContainerHandler:
             "/container/semantic/graph",
             json_data=payload,
         )
+
+    @result_try
+    async def get_container_metrics(
+        self, user: User, container: Container
+    ) -> Result[Dict[str, Any], Exception]:
+        Logger.info(container.id)
+
+        payload = {
+            "user_id": str(user.id),
+            "container_id": str(container.id),
+        }
+
+        return await self.client._make_request(
+            "GET", "/container/metrics", json_data=payload
+        )
+
+    @result_try
+    async def get_containers_status(
+        self, user_id: str, container_ids: List
+    ) -> Result[Dict[str, Any], Exception]:
+        Logger.info(f"Getting status for containers: {container_ids}")
+
+        payload = {"user_id": user_id, "container_ids": container_ids}
+        return await self.client._make_request(
+            "GET", "container/statuses", json_data=payload
+        )
