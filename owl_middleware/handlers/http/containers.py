@@ -11,9 +11,11 @@ router = APIRouter(prefix="/containers", tags=["containers"])
 @router.get("")
 @inject("container_service")
 @inject("auth_service")
+@inject("api_service")
 async def list_containers(
     container_service: ContainerService,
     auth_service: AuthService,
+    api_service: ApiService,
     request: Request,
 ):
     current_user = await get_current_user_from_request(request, auth_service)
@@ -39,7 +41,9 @@ async def list_containers(
         containers_data.append(
             {
                 "id": container.id,
-                "status": "running",
+                "status": await api_service.containers.get_containers_status(
+                    current_user.id, [container.id]
+                ),
                 "memory_limit": container.tariff.memory_limit,
                 "storage_quota": container.tariff.storage_quota,
                 "file_limit": container.tariff.file_limit,

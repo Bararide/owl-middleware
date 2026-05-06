@@ -170,6 +170,7 @@ class ContainerHandler:
         Logger.info(f"Getting status for containers: {container_ids}")
 
         payload = {"user_id": user_id, "container_ids": container_ids}
+
         return await self.client._make_request(
-            "GET", "container/statuses", json_data=payload
+            "POST", "container/status", json_data=payload
         )
