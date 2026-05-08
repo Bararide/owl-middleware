@@ -172,5 +172,5 @@ class ContainerHandler:
         payload = {"user_id": user_id, "container_ids": container_ids}
 
         return await self.client._make_request(
-            "POST", "container/status", json_data=payload
+            "POST", "/container/status", json_data=payload
         )
