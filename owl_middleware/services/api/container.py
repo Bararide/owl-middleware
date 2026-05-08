@@ -77,8 +77,8 @@ class ContainerHandler:
         privileged: bool,
     ) -> Result[Dict[str, Any], Exception]:
         payload = {
-            "user_id": user_id,
-            "container_id": container_id,
+            "user_id": str(user_id),
+            "container_id": str(container_id),
             "memory_limit": tariff.memory_limit,
             "storage_quota": tariff.storage_quota,
             "file_limit": tariff.file_limit,
@@ -167,9 +167,9 @@ class ContainerHandler:
     async def get_containers_status(
         self, user_id: str, container_ids: List
     ) -> Result[Dict[str, Any], Exception]:
-        Logger.info(f"Getting status for containers: {container_ids}")
+        payload = {"user_id": str(user_id), "container_ids": container_ids}
 
-        payload = {"user_id": user_id, "container_ids": container_ids}
+        Logger.info(payload)
 
         return await self.client._make_request(
             "POST", "/container/status", json_data=payload

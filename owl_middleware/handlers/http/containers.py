@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from fastbot.decorators import inject
+from fastbot.logger.logger import Logger
 from .dependencies import get_current_user_from_request
 from services import ContainerService, AuthService, ApiService
-from models import User
+from models import User, Container, Tariff, Label
 from datetime import datetime
+
+import traceback
 
 router = APIRouter(prefix="/containers", tags=["containers"])
 
@@ -63,6 +66,143 @@ async def list_containers(
         )
 
     return {"data": containers_data}
+
+
+@router.post("")
+@inject("container_service")
+@inject("auth_service")
+@inject("api_service")
+async def create_container(
+    request: Request,
+    container_service: ContainerService,
+    auth_service: AuthService,
+    api_service: ApiService,
+):
+    try:
+        body = await request.body()
+
+        import json
+
+        request_data_dict = json.loads(body)
+        current_user = await get_current_user_from_request(request, auth_service)
+
+        user_id = request_data_dict.get("user_id", str(current_user.tg_id))
+
+        tariff = Tariff(
+            memory_limit=request_data_dict["memory_limit"],
+            storage_quota=request_data_dict["storage_quota"],
+            file_limit=request_data_dict["file_limit"],
+        )
+
+        env_label = Label(
+            key=request_data_dict["env_label"]["key"],
+            value=request_data_dict["env_label"]["value"],
+        )
+
+        type_label = Label(
+            key=request_data_dict["type_label"]["key"],
+            value=request_data_dict["type_label"]["value"],
+        )
+
+        container = Container(
+            id=request_data_dict["container_id"],
+            user_id=user_id,
+            tariff=tariff,
+            env_label=env_label,
+            type_label=type_label,
+            privileged=request_data_dict.get("privileged", False),
+            commands=request_data_dict.get("commands", []),
+        )
+
+        container_data_for_db = {
+            "container_id": container.id,
+            "user_id": container.user_id,
+            "memory_limit": container.tariff.memory_limit,
+            "storage_quota": container.tariff.storage_quota,
+            "file_limit": container.tariff.file_limit,
+            "env_label": {
+                "key": container.env_label.key,
+                "value": container.env_label.value,
+            },
+            "type_label": {
+                "key": container.type_label.key,
+                "value": container.type_label.value,
+            },
+            "commands": container.commands,
+            "privileged": container.privileged,
+        }
+
+        container_result = await container_service.create_container(
+            container_data_for_db
+        )
+
+        if container_result.is_err():
+            error = container_result.unwrap_err()
+            Logger.error(f"Container creation failed: {error}")
+            if "already exists" in str(error).lower():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Container with ID '{container.id}' already exists",
+                )
+            raise HTTPException(
+                status_code=500, detail=f"Error creating container: {str(error)}"
+            )
+
+        created_container = container_result.unwrap()
+
+        api_result = await api_service.containers.create_container(
+            user_id=user_id,
+            container_id=container.id,
+            tariff=tariff,
+            env_label=env_label,
+            type_label=type_label,
+            commands=container.commands,
+            privileged=container.privileged,
+        )
+
+        if api_result.is_err():
+            error = api_result.unwrap_err()
+            Logger.error(f"API service error: {error}")
+            await container_service.delete_container(user_id, container.id)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create container in backend: {str(error)}",
+            )
+
+        response_data = {
+            "data": {
+                "container_id": created_container.id,
+                "user_id": created_container.user_id,
+                "status": "created",
+                "memory_limit": created_container.tariff.memory_limit,
+                "storage_quota": created_container.tariff.storage_quota,
+                "file_limit": created_container.tariff.file_limit,
+                "env_label": {
+                    "key": created_container.env_label.key,
+                    "value": created_container.env_label.value,
+                },
+                "type_label": {
+                    "key": created_container.type_label.key,
+                    "value": created_container.type_label.value,
+                },
+                "commands": created_container.commands,
+                "privileged": created_container.privileged,
+                "created_at": datetime.now().isoformat(),
+                "cpu_usage": 0,
+                "memory_usage": 0,
+                "storage_used": 0,
+                "storage_usage_percent": 0,
+            }
+        }
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        Logger.error(f"Unexpected error in create_container: {e}")
+        Logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.get("/{container_id}")
