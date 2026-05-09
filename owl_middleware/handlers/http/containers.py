@@ -41,12 +41,21 @@ async def list_containers(
             storage_usage_percent = 0
             total_size = 0
 
+        container_status_result = await api_service.containers.get_containers_status(
+            current_user.id, [container.id]
+        )
+
+        Logger.info(f"STATUS: {container_status_result.unwrap()}")
+
+        container_status = "stopped"
+
+        if container_status_result.unwrap() == "1":
+            container_status = "running"
+
         containers_data.append(
             {
                 "id": container.id,
-                "status": await api_service.containers.get_containers_status(
-                    current_user.id, [container.id]
-                ),
+                "status": container_status,
                 "memory_limit": container.tariff.memory_limit,
                 "storage_quota": container.tariff.storage_quota,
                 "file_limit": container.tariff.file_limit,

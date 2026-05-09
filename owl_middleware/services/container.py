@@ -121,8 +121,6 @@ class ContainerService:
             },
         }
 
-        Logger.error("4")
-
         return Ok(limits_status)
 
     @result_try
