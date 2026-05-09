@@ -109,6 +109,6 @@ async def get_semantic_graph(
             detail=f"get semantic graph error: {maybe_graph.unwrap_err()}",
         )
 
-    Logger.info(f"{maybe_graph.unwrap()}")
+    # Logger.info(f"{maybe_graph.unwrap()}")
 
     return {"data": maybe_graph.unwrap()}

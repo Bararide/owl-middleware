@@ -221,7 +221,7 @@ async def handle_choose_container(
             str(user.tg_id)
         )
 
-        Logger.info(f"{containers_result.unwrap()}")
+        # Logger.info(f"{containers_result.unwrap()}")
 
         if containers_result.is_err():
             Logger.error(
@@ -245,7 +245,7 @@ async def handle_choose_container(
 
         container_names = [str(container.id) for container in containers]
 
-        Logger.info(f"{container_names}")
+        # Logger.info(f"{container_names}")
 
         return {
             "context": await cen.get("choose_container"),
