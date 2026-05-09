@@ -169,7 +169,12 @@ class ContainerService:
 
         [await self.file_service.delete_file(file.id) for file in files]
 
-        await self.api_service.delete_container(user_id, container_id)
+        api_result = await self.api_service.containers.delete_container(
+            user_id, container_id
+        )
+
+        if api_result.is_err():
+            return Err(api_result.unwrap())
 
         result = await self.containers.delete_one({"id": container_id})
         return Ok(result.deleted_count > 0)
