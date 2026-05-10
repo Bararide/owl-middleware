@@ -45,12 +45,15 @@ async def list_containers(
             current_user.id, [container.id]
         )
 
-        Logger.info(f"STATUS: {container_status_result.unwrap()}")
-
         container_status = "stopped"
+        status_data = container_status_result.unwrap()
 
-        if container_status_result.unwrap() == "1":
-            container_status = "running"
+        try:
+            if status_data.get("success") and status_data.get("statuses"):
+                status_value = status_data["statuses"][0]["status"]
+                container_status = "running" if status_value == "1" else "stopped"
+        except (KeyError, IndexError, TypeError) as e:
+            Logger.error(f"Error parsing container status: {e}")
 
         containers_data.append(
             {
