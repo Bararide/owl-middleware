@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastbot.decorators import inject
 from fastbot.logger.logger import Logger
+from .dependencies import get_current_user_from_request
 from services import ApiService, ContainerService, AuthService
 from models import User
 import logging
@@ -20,21 +21,7 @@ async def semantic_search(
     container_service: ContainerService,
     auth_service: AuthService,
 ):
-    token = None
-    auth_header = req.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = req.query_params.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    current_user = user_result.unwrap()
+    current_user = await get_current_user_from_request(request, auth_service)
 
     query = request.get("query", "").strip()
     container_id = request.get("container_id")
@@ -55,7 +42,6 @@ async def semantic_search(
         query, current_user, container, limit=limit
     )
     if search_result.is_err():
-        logger.error(f"SEMANTIC SEARCH ERROR: {search_result.unwrap_err()}")
         raise HTTPException(
             status_code=500, detail=f"Search error: {search_result.unwrap_err()}"
         )

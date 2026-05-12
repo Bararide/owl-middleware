@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastbot.decorators import inject
+from .dependencies import get_current_user_from_request
 from services import ApiService, ContainerService, AuthService, Ocr
 from models import User
 from datetime import datetime
@@ -23,21 +24,7 @@ async def process_ocr(
     auth_service: AuthService,
     ocr_service: Ocr,
 ):
-    token = None
-    auth_header = req.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = req.query_params.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    current_user = user_result.unwrap()
+    current_user = await get_current_user_from_request(request, auth_service)
 
     container_id = request.get("container_id")
     file_data_base64 = request.get("file_data")

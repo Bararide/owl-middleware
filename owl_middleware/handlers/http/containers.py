@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Body, HTTPException, Request
 from fastbot.decorators import inject
 from fastbot.logger.logger import Logger
-from .dependencies import get_current_user_from_request
+from .dependencies import (
+    container_to_response,
+    get_container_stats,
+    get_container_status,
+    get_current_user_from_request,
+)
 from services import ContainerService, AuthService, ApiService
 from models import User, Container, Tariff, Label
 from datetime import datetime
@@ -29,53 +34,11 @@ async def list_containers(
     if containers_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching containers")
 
-    containers = containers_result.unwrap()
     containers_data = []
-    for container in containers:
-        stats_result = await container_service.get_container_stats(container.id)
-        if stats_result.is_ok():
-            stats = stats_result.unwrap()
-            storage_usage_percent = stats["storage_usage_percent"]
-            total_size = stats["total_size"]
-        else:
-            storage_usage_percent = 0
-            total_size = 0
-
-        container_status_result = await api_service.containers.get_containers_status(
-            current_user.id, [container.id]
-        )
-
-        container_status = "stopped"
-        status_data = container_status_result.unwrap()
-
-        try:
-            if status_data.get("success") and status_data.get("statuses"):
-                status_value = status_data["statuses"][0]["status"]
-                container_status = "running" if status_value == "1" else "stopped"
-        except (KeyError, IndexError, TypeError) as e:
-            Logger.error(f"Error parsing container status: {e}")
-
-        containers_data.append(
-            {
-                "id": container.id,
-                "status": container_status,
-                "memory_limit": container.tariff.memory_limit,
-                "storage_quota": container.tariff.storage_quota,
-                "file_limit": container.tariff.file_limit,
-                "env_label": container.env_label,
-                "type_label": container.type_label,
-                "created_at": datetime.now().isoformat(),
-                "cpu_usage": "10",
-                "memory_usage": storage_usage_percent
-                / (container.tariff.storage_quota * 1024)
-                * 100,
-                "user_id": container.user_id,
-                "commands": container.commands,
-                "privileged": container.privileged,
-                "storage_used": total_size,
-                "storage_usage_percent": storage_usage_percent,
-            }
-        )
+    for container in containers_result.unwrap():
+        stats = await get_container_stats(container_service, container.id)
+        status = await get_container_status(api_service, current_user.id, container.id)
+        containers_data.append(await container_to_response(container, stats, status))
 
     return {"data": containers_data}
 
@@ -227,34 +190,17 @@ async def get_container(
     request: Request,
 ):
     current_user = await get_current_user_from_request(request, auth_service)
-
     container_result = await container_service.get_container(container_id)
-    if container_result.is_err() or not container_result.unwrap():
+
+    if container_result.is_err():
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
+
     if container.user_id != str(current_user.id) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return {
-        "data": {
-            "id": container.id,
-            "status": container.status,
-            "memory_limit": container.memory_limit,
-            "storage_quota": container.storage_quota,
-            "file_limit": container.file_limit,
-            "env_label": container.env_label,
-            "type_label": container.type_label,
-            "created_at": (
-                container.created_at.isoformat() if container.created_at else None
-            ),
-            "cpu_usage": container.cpu_usage,
-            "memory_usage": container.memory_usage,
-            "user_id": container.user_id,
-            "commands": container.commands,
-            "privileged": container.privileged,
-        }
-    }
+    return {"data": container.dict()}
 
 
 @router.delete("/{container_id}")

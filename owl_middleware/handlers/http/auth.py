@@ -90,12 +90,4 @@ async def get_user(
     auth_service: AuthService,
 ):
     current_user = await get_current_user_from_request(request, auth_service)
-
-    return {
-        "data": {
-            "id": current_user.id,
-            "name": current_user.username,
-            "email": current_user.email,
-            "role": current_user.is_admin,
-        }
-    }
+    return {"data": current_user.dict()}
