@@ -5,6 +5,7 @@ from .container import ContainerService
 from .pdf import TextService
 from .valito import HanaValidator
 from .agent import AgentService
+from .groups import GroupService
 from .ocr import Ocr
 
 from .api import ApiService
@@ -22,4 +23,5 @@ __all__ = [
     "AgentService",
     "Ocr",
     "State",
+    "GroupService",
 ]

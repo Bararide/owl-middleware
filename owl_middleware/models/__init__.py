@@ -4,6 +4,8 @@ from .tariff import Tariff
 from .label import Label
 from .container import Container
 from .semantic_edge import SemanticEdge
+from .group import Group
+from .file2group import File2Group
 
 __all__ = [
     "User",
@@ -14,4 +16,6 @@ __all__ = [
     "Container",
     "UserCreate",
     "SemanticEdge",
+    "Group",
+    "File2Group",
 ]
