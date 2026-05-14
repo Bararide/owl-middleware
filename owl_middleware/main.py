@@ -69,6 +69,7 @@ async def main() -> None:
     container_service = services.ContainerService(
         database_service, api_service, file_service
     )
+    group_service = services.GroupService(database_service, container_service)
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     agent_service = services.AgentService(
         api_key=getenv("MISTRAL_API_KEY"),
@@ -106,6 +107,7 @@ async def main() -> None:
     bot_builder.add_dependency("template_engine", template_service)
     bot_builder.add_dependency("context_engine", context_service)
     bot_builder.add_dependency("container_service", container_service)
+    bot_builder.add_dependency("group_service", group_service)
     bot_builder.add_dependency("text_service", text_service)
     bot_builder.add_dependency("agent_service", agent_service)
     bot_builder.add_dependency("deepseek_agent_service", deepseek_agent_service)
@@ -181,6 +183,7 @@ async def main() -> None:
     bot.app.state.template_service = template_service
     bot.app.state.context_service = context_service
     bot.app.state.container_service = container_service
+    bot.app.state.group_service = group_service
     bot.app.state.text_service = text_service
     bot.app.state.agent_service = agent_service
     bot.app.state.deepseek_agent_service = deepseek_agent_service

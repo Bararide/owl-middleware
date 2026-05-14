@@ -4,7 +4,6 @@ from models import File, Group, File2Group
 from fastbot.core import Result, result_try, Err, Ok
 from datetime import datetime
 from .db import DBService
-from .api import ApiService
 from .container import ContainerService
 
 
@@ -12,11 +11,9 @@ class GroupService:
     def __init__(
         self,
         db_service: DBService,
-        api_service: ApiService,
         container_service: ContainerService,
     ):
         self.db_service = db_service
-        self.api_service = api_service
         self.container_service = container_service
         self.groups = self.db_service.db["groups"]
         self.file2group = self.db_service.db["file2group"]
@@ -192,7 +189,6 @@ class GroupService:
     async def remove_multiple_files_from_group(
         self, file_ids: List[str], group_id: str
     ) -> Result[int, Exception]:
-        """Удалить несколько файлов из группы"""
         removed_count = 0
         for file_id in file_ids:
             result = await self.remove_file_from_group(file_id, group_id)
