@@ -31,7 +31,6 @@ class GroupService:
     async def get_groups_by_container(
         self, container_id: str
     ) -> Result[List[Group], Exception]:
-        """Получить все группы контейнера"""
         groups = await self.groups.find({"container_id": container_id}).to_list(None)
         return Ok([Group(**group) for group in groups])
 
