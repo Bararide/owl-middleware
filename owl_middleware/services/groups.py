@@ -42,7 +42,11 @@ class GroupService:
 
     @result_try
     async def create_group(
-        self, name: str, container_id: str, description: str = ""
+        self,
+        name: str,
+        container_id: str,
+        description: str = "",
+        color: str = "#ff9800",
     ) -> Result[Group, Exception]:
         existing_group = await self.groups.find_one(
             {"id": name, "container_id": container_id}
@@ -56,6 +60,7 @@ class GroupService:
             id=name,
             container_id=container_id,
             description=description,
+            color=color,
             created_at=datetime.utcnow(),
         )
         await self.groups.insert_one(group.dict())
@@ -64,11 +69,24 @@ class GroupService:
 
     @result_try
     async def update_group(
-        self, group_id: str, container_id: str, description: str
+        self,
+        group_id: str,
+        container_id: str,
+        description: str = None,
+        color: str = None,
     ) -> Result[bool, Exception]:
+        update_data = {}
+        if description is not None:
+            update_data["description"] = description
+        if color is not None:
+            update_data["color"] = color
+
+        if not update_data:
+            return Ok(True)
+
         result = await self.groups.update_one(
             {"id": group_id, "container_id": container_id},
-            {"$set": {"description": description}},
+            {"$set": update_data},
         )
         if result.matched_count == 0:
             return Err(
@@ -246,6 +264,7 @@ class GroupService:
             "group_id": group.id,
             "container_id": group.container_id,
             "description": group.description,
+            "color": group.color,
             "created_at": group.created_at,
             "total_files": len(file_ids),
             "total_size": total_size,

@@ -66,8 +66,11 @@ async def create_group(
             raise HTTPException(status_code=400, detail="Group name is required")
 
         description = body.get("description", "")
+        color = body.get("color", "#ff9800")
 
-        group_result = await group_service.create_group(name, container_id, description)
+        group_result = await group_service.create_group(
+            name, container_id, description, color
+        )
         if group_result.is_err():
             error = group_result.unwrap_err()
             if "already exists" in str(error).lower():
@@ -147,11 +150,10 @@ async def update_group(
             raise HTTPException(status_code=403, detail="Access denied")
 
         description = body.get("description")
-        if description is None:
-            raise HTTPException(status_code=400, detail="Description is required")
+        color = body.get("color")
 
         update_result = await group_service.update_group(
-            group_id, group.container_id, description
+            group_id, group.container_id, description, color
         )
 
         if update_result.is_err():
@@ -239,10 +241,6 @@ async def add_file_to_group(
         if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        # content_result = await group_service.api_service.files.get_file_content(file_id, group.container_id)
-        # if content_result.is_err():
-        #     raise HTTPException(status_code=404, detail="File not found")
-
         add_result = await group_service.add_file_to_group(file_id, group_id)
         if add_result.is_err():
             error = add_result.unwrap_err()
@@ -256,12 +254,6 @@ async def add_file_to_group(
             "data": add_result.unwrap().dict(),
             "message": f"File {file_id} added to group {group_id}",
         }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        Logger.error(f"Unexpected error in add_file_to_group: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     except HTTPException:
         raise
@@ -350,10 +342,12 @@ async def get_group_files(
 @router.get("/file/{file_id}/groups")
 @inject("group_service")
 @inject("auth_service")
+@inject("container_service")
 async def get_file_groups(
     file_id: str,
     group_service: GroupService,
     auth_service: AuthService,
+    container_service: ContainerService,
     request: Request,
 ):
     current_user = await get_current_user_from_request(request, auth_service)
@@ -365,15 +359,7 @@ async def get_file_groups(
     groups = groups_result.unwrap()
 
     if groups:
-        container_id = groups[0].container_id
-        from services import ContainerService
-
-        container_service = ContainerService(
-            db_service=group_service.db_service,
-            api_service=group_service.api_service,
-            file_service=group_service.file_service,
-        )
-        container_result = await container_service.get_container(container_id)
+        container_result = await container_service.get_container(groups[0].container_id)
         if container_result.is_ok():
             container = container_result.unwrap()
             if (
@@ -389,14 +375,12 @@ async def get_file_groups(
 @inject("group_service")
 @inject("auth_service")
 @inject("container_service")
-@inject("file_service")
 async def add_multiple_files_to_group(
     group_id: str,
     request: Request,
     group_service: GroupService,
     auth_service: AuthService,
     container_service: ContainerService,
-    file_service: FileService,
 ):
     try:
         body = await request.json()
@@ -427,7 +411,7 @@ async def add_multiple_files_to_group(
         added_files = add_result.unwrap()
         return {
             "message": f"Added {len(added_files)} files to group {group_id}",
-            "data": [file.dict() for file in added_files],
+            "data": [f.dict() for f in added_files],
         }
 
     except HTTPException:
