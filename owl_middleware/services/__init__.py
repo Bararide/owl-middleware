@@ -6,6 +6,7 @@ from .pdf import TextService
 from .valito import HanaValidator
 from .agent import AgentService
 from .groups import GroupService
+from .redis import RedisService
 from .ocr import Ocr
 
 from .api import ApiService
@@ -24,4 +25,5 @@ __all__ = [
     "Ocr",
     "State",
     "GroupService",
+    "RedisService",
 ]

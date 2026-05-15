@@ -72,20 +72,25 @@ async def main() -> None:
     group_service = services.GroupService(
         database_service, container_service, file_service, api_service
     )
+
+    redis_service = services.RedisService(
+        getenv("REDIS_HOST"), getenv("REDIS_PORT"), False
+    )
+
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     agent_service = services.AgentService(
         api_key=getenv("MISTRAL_API_KEY"),
-        prompts_dir="owl_middleware/templates/prompts",
+        prompts_dir=getenv("PROMPTS_DIR"),
         base_url=None,
-        provider="mistral",
+        provider=getenv("MISTRAL_PROVIDER"),
     )
 
     deepseek_agent_service = services.AgentService(
         api_key=getenv("DEEPSEEK_API_KEY"),
-        prompts_dir="owl_middleware/templates/prompts",
+        prompts_dir=getenv("PROMPTS_DIR"),
         default_model="deepseek-chat",
         base_url=getenv("DEEPSEEK_BASE_URL"),
-        provider="deepseek",
+        provider=getenv("DEEPSEEK_PROVIDER"),
     )
     ocr_service = services.Ocr(getenv("NOVITA_API_KEY"))
     auth_middleware = middleware.AuthMiddleware(auth_service)
@@ -110,6 +115,7 @@ async def main() -> None:
     bot_builder.add_dependency("context_engine", context_service)
     bot_builder.add_dependency("container_service", container_service)
     bot_builder.add_dependency("group_service", group_service)
+    bot_builder.add_dependency("redis_service", redis_service)
     bot_builder.add_dependency("text_service", text_service)
     bot_builder.add_dependency("agent_service", agent_service)
     bot_builder.add_dependency("deepseek_agent_service", deepseek_agent_service)
@@ -186,6 +192,7 @@ async def main() -> None:
     bot.app.state.context_service = context_service
     bot.app.state.container_service = container_service
     bot.app.state.group_service = group_service
+    bot.app.state.redis_service = redis_service
     bot.app.state.text_service = text_service
     bot.app.state.agent_service = agent_service
     bot.app.state.deepseek_agent_service = deepseek_agent_service
