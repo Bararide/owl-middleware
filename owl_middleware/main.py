@@ -69,7 +69,9 @@ async def main() -> None:
     container_service = services.ContainerService(
         database_service, api_service, file_service
     )
-    group_service = services.GroupService(database_service, container_service)
+    group_service = services.GroupService(
+        database_service, container_service, file_service, api_service
+    )
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     agent_service = services.AgentService(
         api_key=getenv("MISTRAL_API_KEY"),

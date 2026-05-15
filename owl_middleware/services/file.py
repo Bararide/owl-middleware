@@ -12,9 +12,11 @@ class FileService:
         self.files = self.db_service.db["files"]
 
     @result_try
-    async def get_file(self, file_id: str) -> File:
+    async def get_file(self, file_id: str) -> Result[File, Exception]:
         file = await self.files.find_one({"id": file_id})
-        return File(**file) if file else None
+        if file:
+            return Ok(File(**file))
+        return Err(ValueError(f"File {file_id} not found"))
 
     @result_try
     async def create_file(self, file_data: dict) -> File:

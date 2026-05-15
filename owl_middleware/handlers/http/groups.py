@@ -331,7 +331,7 @@ async def get_group_files(
     if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    files_result = await group_service.get_files_by_group(group_id)
+    files_result = await group_service.get_files_by_group(group_id, container.id)
     if files_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching files")
 

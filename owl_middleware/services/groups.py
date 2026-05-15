@@ -4,7 +4,9 @@ from models import File, Group, File2Group
 from fastbot.core import Result, result_try, Err, Ok
 from datetime import datetime
 from .db import DBService
+from .file import FileService
 from .container import ContainerService
+from .api import ApiService
 
 
 class GroupService:
@@ -12,9 +14,13 @@ class GroupService:
         self,
         db_service: DBService,
         container_service: ContainerService,
+        file_service: FileService,
+        api_service: ApiService,
     ):
         self.db_service = db_service
         self.container_service = container_service
+        self.file_service = file_service
+        self.api_service = api_service
         self.groups = self.db_service.db["groups"]
         self.file2group = self.db_service.db["file2group"]
 
@@ -113,26 +119,48 @@ class GroupService:
         return Ok(result.deleted_count > 0)
 
     @result_try
-    async def get_files_by_group(self, group_id: str) -> Result[List[File], Exception]:
+    async def get_files_by_group(
+        self, group_id: str, container_id: str
+    ) -> Result[List[File], Exception]:
+        group_result = await self.get_group(group_id)
+        if group_result.is_err():
+            return group_result
+        group = group_result.unwrap()
+
         file_relations = await self.file2group.find({"group_id": group_id}).to_list(
             None
         )
-
         if not file_relations:
             return Ok([])
 
-        file_ids = [rel["file_id"] for rel in file_relations]
         files = []
-
-        from .file import FileService
-
-        file_service = FileService(self.db_service, self.api_service)
-
-        for file_id in file_ids:
-            file_result = await file_service.get_file(file_id)
-            if file_result.is_ok():
-                files.append(file_result.unwrap())
-
+        for rel in file_relations:
+            file_path = rel["file_id"]
+            result = await self.api_service.files.get_file_content(
+                str(file_path), str(container_id)
+            )
+            if result.is_ok():
+                data = result.unwrap()
+                if isinstance(data, dict):
+                    file_obj = File(
+                        id=file_path,
+                        name=data.get("name", file_path.split("/")[-1]),
+                        path=file_path,
+                        size=data.get("size", 0),
+                        container_id=group.container_id,
+                        user_id="",
+                        created_at=data.get(
+                            "created_at", datetime.utcnow().isoformat()
+                        ),
+                        mime_type=data.get("mime_type", "application/octet-stream"),
+                    )
+                    files.append(file_obj)
+                else:
+                    Logger.warning(f"Unexpected response for {file_path}: {data}")
+            else:
+                Logger.warning(
+                    f"Failed to fetch file {file_path}: {result.unwrap_err()}"
+                )
         return Ok(files)
 
     @result_try
