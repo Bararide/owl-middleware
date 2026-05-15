@@ -210,14 +210,12 @@ async def delete_group(
 @inject("group_service")
 @inject("auth_service")
 @inject("container_service")
-@inject("file_service")
 async def add_file_to_group(
     group_id: str,
     request: Request,
     group_service: GroupService,
     auth_service: AuthService,
     container_service: ContainerService,
-    file_service: FileService,
 ):
     try:
         body = await request.json()
@@ -241,9 +239,9 @@ async def add_file_to_group(
         if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        file_result = await file_service.get_file(file_id)
-        if file_result.is_err():
-            raise HTTPException(status_code=404, detail="File not found")
+        # content_result = await group_service.api_service.files.get_file_content(file_id, group.container_id)
+        # if content_result.is_err():
+        #     raise HTTPException(status_code=404, detail="File not found")
 
         add_result = await group_service.add_file_to_group(file_id, group_id)
         if add_result.is_err():
@@ -258,6 +256,12 @@ async def add_file_to_group(
             "data": add_result.unwrap().dict(),
             "message": f"File {file_id} added to group {group_id}",
         }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        Logger.error(f"Unexpected error in add_file_to_group: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     except HTTPException:
         raise
@@ -331,48 +335,53 @@ async def get_group_files(
     if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    files_result = await group_service.get_files_by_group(group_id, container.id)
+    files_result = await group_service.get_files_by_group(group_id)
     if files_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching files")
 
     files = files_result.unwrap()
-    return {"data": [file.dict() for file in files]}
+    return {
+        "data": [
+            {"id": f.id, "name": f.name, "container_id": f.container_id} for f in files
+        ]
+    }
 
 
 @router.get("/file/{file_id}/groups")
 @inject("group_service")
 @inject("auth_service")
-@inject("container_service")
-@inject("file_service")
 async def get_file_groups(
     file_id: str,
     group_service: GroupService,
     auth_service: AuthService,
-    container_service: ContainerService,
-    file_service: FileService,
     request: Request,
 ):
     current_user = await get_current_user_from_request(request, auth_service)
-
-    file_result = await file_service.get_file(file_id)
-    if file_result.is_err():
-        raise HTTPException(status_code=404, detail="File not found")
-
-    file = file_result.unwrap()
-
-    container_result = await container_service.get_container(file.container_id)
-    if container_result.is_err():
-        raise HTTPException(status_code=404, detail="Container not found")
-
-    container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
 
     groups_result = await group_service.get_groups_by_file(file_id)
     if groups_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching groups")
 
     groups = groups_result.unwrap()
+
+    if groups:
+        container_id = groups[0].container_id
+        from services import ContainerService
+
+        container_service = ContainerService(
+            db_service=group_service.db_service,
+            api_service=group_service.api_service,
+            file_service=group_service.file_service,
+        )
+        container_result = await container_service.get_container(container_id)
+        if container_result.is_ok():
+            container = container_result.unwrap()
+            if (
+                container.user_id != str(current_user.tg_id)
+                and not current_user.is_admin
+            ):
+                raise HTTPException(status_code=403, detail="Access denied")
+
     return {"data": [group.dict() for group in groups]}
 
 

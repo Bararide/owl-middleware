@@ -119,9 +119,7 @@ class GroupService:
         return Ok(result.deleted_count > 0)
 
     @result_try
-    async def get_files_by_group(
-        self, group_id: str, container_id: str
-    ) -> Result[List[File], Exception]:
+    async def get_files_by_group(self, group_id: str) -> Result[List[File], Exception]:
         group_result = await self.get_group(group_id)
         if group_result.is_err():
             return group_result
@@ -135,32 +133,17 @@ class GroupService:
 
         files = []
         for rel in file_relations:
-            file_path = rel["file_id"]
-            result = await self.api_service.files.get_file_content(
-                str(file_path), str(container_id)
+            file_id = rel["file_id"]
+            file_obj = File(
+                id=file_id,
+                name=file_id.split("/")[-1] if "/" in file_id else file_id,
+                container_id=group.container_id,
+                user_id="",
+                created_at=None,
+                mime_type="application/octet-stream",
+                size=0,
             )
-            if result.is_ok():
-                data = result.unwrap()
-                if isinstance(data, dict):
-                    file_obj = File(
-                        id=file_path,
-                        name=data.get("name", file_path.split("/")[-1]),
-                        path=file_path,
-                        size=data.get("size", 0),
-                        container_id=group.container_id,
-                        user_id="",
-                        created_at=data.get(
-                            "created_at", datetime.utcnow().isoformat()
-                        ),
-                        mime_type=data.get("mime_type", "application/octet-stream"),
-                    )
-                    files.append(file_obj)
-                else:
-                    Logger.warning(f"Unexpected response for {file_path}: {data}")
-            else:
-                Logger.warning(
-                    f"Failed to fetch file {file_path}: {result.unwrap_err()}"
-                )
+            files.append(file_obj)
         return Ok(files)
 
     @result_try
@@ -208,7 +191,6 @@ class GroupService:
                 Logger.warning(
                     f"Failed to add file {file_id} to group {group_id}: {result.unwrap_err()}"
                 )
-
         Logger.info(f"Added {len(results)} files to group {group_id}")
         return Ok(results)
 
@@ -232,29 +214,44 @@ class GroupService:
             return group_result
 
         group = group_result.unwrap()
-        files = await self.get_files_by_group(group_id)
+        file_relations = await self.file2group.find({"group_id": group_id}).to_list(
+            None
+        )
+        file_ids = [rel["file_id"] for rel in file_relations]
 
-        total_size = sum(file.size or 0 for file in files)
+        total_size = 0
+        file_infos = []
+        for file_id in file_ids:
+            content_result = await self.api_service.files.get_file_content(
+                file_id, group.container_id
+            )
+            if content_result.is_ok():
+                content, explanation = content_result.unwrap()
+                size = len(content.encode("utf-8")) if content else 0
+                total_size += size
+                file_infos.append(
+                    {
+                        "id": file_id,
+                        "name": file_id.split("/")[-1],
+                        "size": size,
+                        "created_at": None,
+                    }
+                )
+            else:
+                Logger.warning(
+                    f"Could not fetch file {file_id} for stats: {content_result.unwrap_err()}"
+                )
 
         stats = {
             "group_id": group.id,
             "container_id": group.container_id,
             "description": group.description,
             "created_at": group.created_at,
-            "total_files": len(files),
+            "total_files": len(file_ids),
             "total_size": total_size,
-            "average_file_size": total_size / len(files) if files else 0,
-            "files": [
-                {
-                    "id": file.id,
-                    "name": file.name,
-                    "size": file.size,
-                    "created_at": file.created_at,
-                }
-                for file in files
-            ],
+            "average_file_size": total_size / len(file_ids) if file_ids else 0,
+            "files": file_infos,
         }
-
         return Ok(stats)
 
     @result_try
