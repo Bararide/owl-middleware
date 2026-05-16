@@ -13,6 +13,8 @@ from .api import ApiService
 
 from .state import State
 
+from .sockets import Connection
+
 __all__ = [
     "AuthService",
     "DBService",
@@ -26,4 +28,5 @@ __all__ = [
     "State",
     "GroupService",
     "RedisService",
+    "Connection",
 ]

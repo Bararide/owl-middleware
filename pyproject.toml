@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-uvicorn = "^0.35.0"
+uvicorn = {extras = ["standard"], version = "^0.47.0"}
 asyncio = "^4.0.0"
 aiofiles = "^24.1.0"
 fastapi = "^0.116.1"
@@ -30,6 +30,7 @@ pillow = "^12.0.0"
 python-multipart = "^0.0.20"
 returns = "^0.26.0"
 redis = "^7.4.0"
+websockets = "^16.0"
 
 
 [build-system]

@@ -1,72 +1,43 @@
 from fastapi import WebSocket
-from fastbot.logger.logger import Logger
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-from typing import List, Dict
-
-import json
 
 
 class Connection:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
-        self.user_connections: Dict[str, WebSocket] = {}
-        self.online_users: List[str] = []
-        self.message_history: List[Dict] = []
-        self.max_history = 50
+        self.container_connections: Dict[str, List[WebSocket]] = {}
+        self.socket_info: Dict[WebSocket, Tuple[str, str]] = {}
 
-    async def connect(self, websocket: WebSocket, client_id: str):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        self.user_connections[client_id] = websocket
-        self.online_users.append(client_id)
-        Logger.info(f"Client connected: {client_id}")
+    async def connect(self, websocket: WebSocket, container_id: str, user_id: str):
+        self.container_connections.setdefault(container_id, []).append(websocket)
+        self.socket_info[websocket] = (container_id, user_id)
 
-        if self.message_history:
-            await websocket.send_text(
-                json.dumps({"type": "history", "messages": self.message_history})
-            )
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.socket_info:
+            cid, uid = self.socket_info.pop(websocket)
+            if cid in self.container_connections:
+                self.container_connections[cid].remove(websocket)
+                if not self.container_connections[cid]:
+                    del self.container_connections[cid]
 
-        await self.broadcast_online_users()
-
-    def disconnect(self, websocket: WebSocket, client_id: str):
-        self.active_connections.remove(websocket)
-        if client_id in self.user_connections:
-            del self.user_connections[client_id]
-        if client_id in self.online_users:
-            self.online_users.remove(client_id)
-        Logger.info(f"Client disconnected: {client_id}")
-
-    async def broadcast_online_users(self):
-        message = json.dumps(
-            {
-                "type": "users_list",
-                "users": self.online_users,
-                "count": len(self.online_users),
-            }
-        )
-        await self.broadcast(message)
-
-    async def broadcast(self, message: str):
+    async def send_personal(self, websocket: WebSocket, message: dict):
         try:
-            msg_data = json.loads(message)
-            if msg_data.get("type") == "message":
-                if "timestamp" not in msg_data:
-                    msg_data["timestamp"] = datetime.now().isoformat()
+            await websocket.send_json(message)
+        except Exception:
+            self.disconnect(websocket)
 
-                self.message_history.append(msg_data)
-                if len(self.message_history) > self.max_history:
-                    self.message_history = self.message_history[-self.max_history :]
-        except:
-            pass
-
+    async def broadcast_to_container(
+        self, container_id: str, message: dict, exclude: Optional[WebSocket] = None
+    ):
+        if container_id not in self.container_connections:
+            return
         disconnected = []
-        for connection in self.active_connections:
+        for ws in self.container_connections[container_id]:
+            if ws == exclude:
+                continue
             try:
-                await connection.send_text(message)
-            except Exception as e:
-                Logger.error(f"Error sending message: {e}")
-                disconnected.append(connection)
-
-        for conn in disconnected:
-            if conn in self.active_connections:
-                self.active_connections.remove(conn)
+                await ws.send_json(message)
+            except Exception:
+                disconnected.append(ws)
+        for ws in disconnected:
+            self.disconnect(ws)

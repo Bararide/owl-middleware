@@ -48,14 +48,14 @@ async def main() -> None:
     )
     context_service = ContextEngine()
 
-    mini_app_config = MiniAppConfig(
-        title="",
-        description="Telegram Mini App with FastAPI",
-        static_dir="static",
-        webhook_path="/webhook",
-        webhook_handler=handle_webhook,
-        ws_handler=websocket_handler,
-    )
+    # mini_app_config = MiniAppConfig(
+    #     title="",
+    #     description="Telegram Mini App with FastAPI",
+    #     static_dir="static",
+    #     webhook_path="/webhook",
+    #     webhook_handler=handle_webhook,
+    #     ws_handler=websocket_handler,
+    # )
 
     jwt_secret = getenv("JWT_SECRET", "fallback-secret-change-in-production")
 
@@ -97,13 +97,14 @@ async def main() -> None:
 
     state_service = services.State()
 
+    ws_manager = services.Connection()
+
     bot_builder = (
         FastBotBuilder()
         .set_bot(Bot(token=getenv("BOT_TOKEN")))
         .set_dispatcher(Dispatcher(storage=storage))
         .add_middleware(middleware.error_handling_middleware)
         .add_middleware(middleware.logger_middleware)
-        .add_mini_app(mini_app_config)
     )
 
     bot_builder.add_dependency("db", database_service)
@@ -121,6 +122,7 @@ async def main() -> None:
     bot_builder.add_dependency("deepseek_agent_service", deepseek_agent_service)
     bot_builder.add_dependency("ocr_service", ocr_service)
     bot_builder.add_dependency("state_service", state_service)
+    bot_builder.add_dependency("ws_manager", ws_manager)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
     bot_builder.add_dependency_resolver(models.File, resolvers.resolve_file)
@@ -197,6 +199,7 @@ async def main() -> None:
     bot.app.state.agent_service = agent_service
     bot.app.state.deepseek_agent_service = deepseek_agent_service
     bot.app.state.ocr_service = ocr_service
+    bot.app.state.ws_manager = ws_manager
     bot.app.state.user_resolver = resolvers.resolve_user
 
     use_webhook = getenv("USE_WEBHOOK", "").lower() == "true"
