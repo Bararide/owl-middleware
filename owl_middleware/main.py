@@ -77,6 +77,8 @@ async def main() -> None:
         getenv("REDIS_HOST"), getenv("REDIS_PORT"), False
     )
 
+    await redis_service.connect()
+
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
     agent_service = services.AgentService(
         api_key=getenv("MISTRAL_API_KEY"),

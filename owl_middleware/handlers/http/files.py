@@ -1,8 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastbot.logger import Logger
 from fastbot.decorators import inject
 from .dependencies import get_current_user_from_request
-from services import ContainerService, ApiService, AuthService, FileService, TextService
-from models import User
+from services import (
+    ContainerService,
+    ApiService,
+    AuthService,
+    FileService,
+    TextService,
+    RedisService,
+)
 from datetime import datetime
 import base64
 
@@ -171,6 +178,7 @@ async def upload_file_in_container(
 @inject("container_service")
 @inject("api_service")
 @inject("file_service")
+@inject("redis_service")
 async def get_file_content(
     container_id: str,
     file_id: str,
@@ -178,6 +186,7 @@ async def get_file_content(
     container_service: ContainerService,
     api_service: ApiService,
     file_service: FileService,
+    redis_service: RedisService,
     request: Request,
 ):
     current_user = await get_current_user_from_request(request, auth_service)
@@ -190,16 +199,29 @@ async def get_file_content(
     if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    content_result = await api_service.files.get_file_content(
-        str(file_id), str(container_id)
-    )
-    if content_result.is_err():
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error reading file content: {content_result.unwrap_err()}",
-        )
+    redis_key = f"file_content:{file_id}"
+    cached_content = await redis_service.get(redis_key)
 
-    content, explanation = content_result.unwrap()
+    if cached_content.is_ok() and cached_content.unwrap():
+        content = cached_content.unwrap()
+        explanation = None
+        from_cache = True
+        Logger.info(f"File content {file_id} retrieved from Redis cache")
+    else:
+        content_result = await api_service.files.get_file_content(
+            str(file_id), str(container_id)
+        )
+        if content_result.is_err():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error reading file content: {content_result.unwrap_err()}",
+            )
+
+        content, explanation = content_result.unwrap()
+        from_cache = False
+
+        await redis_service.set(redis_key, content, ex=3600)
+        Logger.info(f"File content {file_id} stored in Redis cache")
 
     file_service_result = await file_service.get_file(file_id)
     file_metadata = (
@@ -211,6 +233,7 @@ async def get_file_content(
         "encoding": "utf-8",
         "size": len(content),
         "mime_type": file_metadata.mime_type if file_metadata else "text/plain",
+        "from_cache": from_cache,
     }
 
     if explanation:

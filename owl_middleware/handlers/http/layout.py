@@ -1,6 +1,6 @@
-# websocket_routes.py (исправленная версия)
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastbot.decorators import inject
 from fastbot.logger.logger import Logger
 from typing import Optional
 import json
@@ -9,6 +9,9 @@ router = APIRouter(tags=["websocket"])
 
 
 @router.websocket("/ws")
+@inject("auth_service")
+@inject("container_service")
+@inject("group_service")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
