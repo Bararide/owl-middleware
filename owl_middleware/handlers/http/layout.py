@@ -1,31 +1,34 @@
+# websocket_routes.py
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from fastbot.decorators import inject
 from fastbot.logger.logger import Logger
-from typing import Optional
 import json
 
 router = APIRouter(tags=["websocket"])
 
 
+# websocket_routes.py
 @router.websocket("/ws")
-@inject("auth_service")
-@inject("container_service")
-@inject("group_service")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-
-    auth_service = websocket.app.state.auth_service
-    container_service = websocket.app.state.container_service
-    ws_manager = websocket.app.state.ws_manager
-
-    current_user = None
-    current_container_id = None
+    Logger.info("WebSocket connection accepted")
 
     try:
+        auth_service = websocket.app.state.auth_service
+        container_service = websocket.app.state.container_service
+        ws_manager = websocket.app.state.ws_manager
+
         token = websocket.query_params.get("token")
+        container_id = websocket.query_params.get("container_id")
+
         if not token:
             await websocket.close(code=1008, reason="Token required")
+            return
+
+        if not container_id:
+            await websocket.close(
+                code=1002, reason="container_id required in query params"
+            )
             return
 
         user_result = await auth_service.get_user_by_token(token)
@@ -35,21 +38,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
         current_user = user_result.unwrap()
         Logger.info(f"User authenticated: {current_user.tg_id}")
-
-        await websocket.send_json(
-            {
-                "type": "authenticated",
-                "user_id": str(current_user.tg_id),
-                "message": "Authentication successful",
-            }
-        )
-
-        data = await websocket.receive_json()
-        container_id = data.get("container_id")
-
-        if not container_id:
-            await websocket.close(code=1002, reason="container_id required")
-            return
 
         container_result = await container_service.get_container(container_id)
         if container_result.is_err() or not container_result.unwrap():
@@ -62,7 +50,6 @@ async def websocket_endpoint(websocket: WebSocket):
             return
 
         await ws_manager.connect(websocket, container_id, str(current_user.tg_id))
-        current_container_id = container_id
 
         Logger.info(
             f"WebSocket connected: user={current_user.tg_id}, container={container_id}"
@@ -87,7 +74,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
                 elif action == "subscribe":
                     new_container_id = message.get("container_id")
-                    if new_container_id and new_container_id != current_container_id:
+                    if new_container_id and new_container_id != container_id:
                         new_container_result = await container_service.get_container(
                             new_container_id
                         )
@@ -104,12 +91,9 @@ async def websocket_endpoint(websocket: WebSocket):
                                 await ws_manager.connect(
                                     websocket, new_container_id, str(current_user.tg_id)
                                 )
-                                current_container_id = new_container_id
+                                container_id = new_container_id
                                 await websocket.send_json(
-                                    {
-                                        "type": "subscribed",
-                                        "container_id": current_container_id,
-                                    }
+                                    {"type": "subscribed", "container_id": container_id}
                                 )
                 else:
                     await websocket.send_json(
@@ -117,20 +101,26 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
 
             except json.JSONDecodeError:
-                Logger.warning(
-                    f"Received non-JSON message from user {current_user.tg_id}"
-                )
+                Logger.warning(f"Received non-JSON message")
                 continue
 
     except WebSocketDisconnect:
-        if ws_manager and current_user:
+        if (
+            "ws_manager" in locals()
+            and ws_manager
+            and "current_user" in locals()
+            and current_user
+        ):
             ws_manager.disconnect(websocket)
-        Logger.info(
-            f"WebSocket disconnected: user={current_user.tg_id if current_user else 'unknown'}"
-        )
+        Logger.info("WebSocket disconnected")
     except Exception as e:
         Logger.error(f"WebSocket error: {e}")
-        if ws_manager and current_user:
+        if (
+            "ws_manager" in locals()
+            and ws_manager
+            and "current_user" in locals()
+            and current_user
+        ):
             ws_manager.disconnect(websocket)
         try:
             await websocket.close(code=1011, reason="Internal server error")
