@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
-from fastbot.logger import Logger
 from fastbot.decorators import inject
+from fastbot.logger.logger import Logger
 from .dependencies import get_current_user_from_request
 from services import (
     ContainerService,
@@ -10,6 +10,7 @@ from services import (
     TextService,
     RedisService,
 )
+from models import User
 from datetime import datetime
 import base64
 
@@ -206,7 +207,6 @@ async def get_file_content(
         content = cached_content.unwrap()
         explanation = None
         from_cache = True
-        Logger.info(f"File content {file_id} retrieved from Redis cache")
     else:
         content_result = await api_service.files.get_file_content(
             str(file_id), str(container_id)
@@ -221,7 +221,6 @@ async def get_file_content(
         from_cache = False
 
         await redis_service.set(redis_key, content, ex=3600)
-        Logger.info(f"File content {file_id} stored in Redis cache")
 
     file_service_result = await file_service.get_file(file_id)
     file_metadata = (
