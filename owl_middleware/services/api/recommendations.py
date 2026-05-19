@@ -122,7 +122,7 @@ class RecommendationHandler:
 
     @result_try
     async def get_recommendations_blocking(
-        self, user_id: str, container_id: str, timeout: int = 20
+        self, user_id: str, container_id: str, timeout: int = 5
     ) -> Result[List[str], Exception]:
         result_paths = []
         completed = asyncio.Event()
