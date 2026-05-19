@@ -116,6 +116,14 @@ class RecommendationStreamManager:
         Logger.info(f"Subscribed listener {listener_id} for {key}")
         return listener_id
 
+    async def reset(self):
+        """Полный сброс менеджера"""
+        if self.stream:
+            await self.stream.close()
+            self.stream = None
+        self.listeners.clear()
+        self.user_container_key = None
+
     async def unsubscribe(self, listener_id: str):
         if listener_id in self.listeners:
             del self.listeners[listener_id]

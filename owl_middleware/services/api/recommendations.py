@@ -18,6 +18,8 @@ class RecommendationHandler:
         self.stream_clients: Dict[str, aiohttp.ClientSession] = {}
         self.current_user_id: Optional[str] = None
         self.current_container_id: Optional[str] = None
+        self._reconnect_task: Optional[asyncio.Task] = None
+        self._is_reconnecting = False
 
     @result_try
     async def get_recommendations_stream(
@@ -34,39 +36,50 @@ class RecommendationHandler:
             user_id, container_id, on_paths, on_complete
         )
 
-        reconnect_task = asyncio.create_task(
-            self._monitor_stream(stream_id, user_id, container_id)
-        )
-        self.active_streams[stream_id] = reconnect_task
+        if self._reconnect_task is None or self._reconnect_task.done():
+            self._reconnect_task = asyncio.create_task(
+                self._keep_alive(user_id, container_id)
+            )
 
         return Ok(stream_id)
 
-    async def _monitor_stream(self, stream_id: str, user_id: str, container_id: str):
-        while stream_id in self.stream_manager.listeners:
-            await asyncio.sleep(1)
+    async def _keep_alive(self, user_id: str, container_id: str):
+        """Фоновая задача для поддержания соединения"""
+        while True:
+            await asyncio.sleep(5)
 
             stream = self.stream_manager.stream
-            if stream and not stream.is_alive():
-                Logger.warning(f"Stream {stream_id} dead, reconnecting...")
+            if stream is None:
+                continue
 
-                try:
-                    if self.stream_manager.stream:
-                        await self.stream_manager.stream.close()
+            if not stream.is_alive():
+                Logger.warning("SSE stream is dead, recreating...")
+                await self._recreate_stream(user_id, container_id)
 
-                    self.stream_manager.stream = RecommendationStream(
-                        self.stream_manager.base_url
-                    )
-                    await self.stream_manager.stream.connect(user_id, container_id)
-                    self.stream_manager.stream.on_paths(
-                        self.stream_manager._broadcast_paths
-                    )
-                    self.stream_manager.stream.on_complete(
-                        self.stream_manager._broadcast_complete
-                    )
+    async def _recreate_stream(self, user_id: str, container_id: str):
+        """Пересоздание SSE потока"""
+        if self._is_reconnecting:
+            return
 
-                    Logger.info(f"Stream {stream_id} reconnected")
-                except Exception as e:
-                    Logger.error(f"Failed to reconnect stream {stream_id}: {e}")
+        self._is_reconnecting = True
+        try:
+            if self.stream_manager.stream:
+                await self.stream_manager.stream.close()
+
+            self.stream_manager.stream = RecommendationStream(
+                self.stream_manager.base_url
+            )
+            await self.stream_manager.stream.connect(user_id, container_id)
+            self.stream_manager.stream.on_paths(self.stream_manager._broadcast_paths)
+            self.stream_manager.stream.on_complete(
+                self.stream_manager._broadcast_complete
+            )
+
+            Logger.info("SSE stream recreated successfully")
+        except Exception as e:
+            Logger.error(f"Failed to recreate SSE stream: {e}")
+        finally:
+            self._is_reconnecting = False
 
     @result_try
     async def close_stream(self, stream_id: str) -> Result[bool, Exception]:

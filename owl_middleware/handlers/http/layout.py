@@ -42,6 +42,8 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1003, reason="Access denied")
         return
 
+    await api_service.recommendations.stream_manager.reset()
+
     await ws_manager.connect(websocket, container_id, str(current_user.tg_id))
 
     recommendation_stream_id = None
