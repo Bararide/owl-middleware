@@ -73,8 +73,8 @@ async def get_search_history(
     container_service: ContainerService,
     auth_service: AuthService,
 ):
-    user = get_current_user_from_request(request, auth_service)
-    container = get_current_container(request, container_service)
+    user = await get_current_user_from_request(request, auth_service)
+    container = await get_current_container(request, container_service)
 
     maybe_history = await api_service.containers.get_search_history(user, container)
 
