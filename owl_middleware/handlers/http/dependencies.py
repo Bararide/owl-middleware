@@ -28,6 +28,20 @@ async def get_current_user_from_request(
     return user_result.unwrap()
 
 
+async def get_current_container(
+    request: Request, container_service: ContainerService
+) -> Container:
+    container_id = request.query_params.get("container_id")
+    if not container_id:
+        raise HTTPException(status_code=400, detail="Container ID is required")
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err() or not container_result.unwrap():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    return container_result.unwrap()
+
+
 async def get_container_status(
     api_service: ApiService, user_id: int, container_id: str
 ) -> str:

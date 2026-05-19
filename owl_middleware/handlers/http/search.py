@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastbot.decorators import inject
 from fastbot.logger.logger import Logger
+from .dependencies import get_current_container, get_current_user_from_request
 from services import ApiService, ContainerService, AuthService
 from models import User
 import logging
@@ -55,12 +56,35 @@ async def semantic_search(
         query, current_user, container, limit=limit
     )
     if search_result.is_err():
-        logger.error(f"SEMANTIC SEARCH ERROR: {search_result.unwrap_err()}")
         raise HTTPException(
             status_code=500, detail=f"Search error: {search_result.unwrap_err()}"
         )
 
     return {"data": search_result.unwrap()}
+
+
+@router.get("/history")
+@inject("api_service")
+@inject("container_service")
+@inject("auth_service")
+async def get_search_history(
+    request: Request,
+    api_service: ApiService,
+    container_service: ContainerService,
+    auth_service: AuthService,
+):
+    user = get_current_user_from_request(request, auth_service)
+    container = get_current_container(request, container_service)
+
+    maybe_history = await api_service.containers.get_search_history(user, container)
+
+    if maybe_history.is_err():
+        raise HTTPException(
+            status_code=500,
+            detail=f"get search history error: {maybe_history.unwrap_err()}",
+        )
+
+    return {"data": maybe_history.unwrap()}
 
 
 @router.get("/graph")
