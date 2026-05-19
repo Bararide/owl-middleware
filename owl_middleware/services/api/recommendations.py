@@ -26,42 +26,7 @@ class RecommendationHandler:
             user_id, container_id, on_paths, on_complete
         )
 
-        task = asyncio.create_task(self._keep_alive(stream_id, container_id))
-        self.active_streams[stream_id] = task
-
         return Ok(stream_id)
-
-    async def _keep_alive(self, stream_id: str, container_id: str):
-        retry_count = 0
-        max_retries = 5
-
-        while retry_count < max_retries:
-            try:
-                await asyncio.sleep(30)
-
-                if stream_id not in self.stream_manager.listeners:
-                    break
-
-                listener = self.stream_manager.listeners[stream_id]
-                if listener and listener.is_alive():
-                    retry_count = 0
-                else:
-                    retry_count += 1
-                    Logger.warning(
-                        f"Stream {stream_id} appears dead, attempt {retry_count}/{max_retries}"
-                    )
-
-                    if retry_count >= max_retries:
-                        Logger.error(f"Stream {stream_id} dead, max retries reached")
-                        break
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                Logger.error(f"Keep-alive error for stream {stream_id}: {e}")
-                retry_count += 1
-
-        await self.close_stream(stream_id)
 
     @result_try
     async def close_stream(self, stream_id: str) -> Result[bool, Exception]:

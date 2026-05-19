@@ -35,6 +35,10 @@ class SSEClient:
         """Регистрация обработчика для event: end"""
         return self.on("end", handler)
 
+    def on_error(self, handler: Callable[[Exception], None]):
+        """Регистрация обработчика для ошибок"""
+        return self.on("error", handler)
+
     def _emit(self, event: str, data: Any = None):
         """Вызов обработчиков события"""
         if event in self.event_handlers:
@@ -51,14 +55,18 @@ class SSEClient:
         try:
             async with self.session.get(self.url, headers=headers) as response:
                 if response.status != 200:
-                    return Err(Exception(f"Failed to connect: {response.status}"))
+                    error_msg = f"Failed to connect: {response.status}"
+                    self._emit("error", Exception(error_msg))
+                    return Err(Exception(error_msg))
 
                 Logger.info(f"SSE connected to {self.url}")
-                Logger.info(f"CONTENT: {response.content}")
 
                 self.running = True
 
                 async for line in response.content:
+                    if not self.running:
+                        break
+
                     line = line.decode("utf-8").rstrip("\n")
 
                     if line.startswith("data:"):
@@ -75,7 +83,7 @@ class SSEClient:
                             self._emit("end")
                             break
 
-                    elif line == "":
+                    elif line.startswith(":"):
                         continue
 
                 return Ok(True)

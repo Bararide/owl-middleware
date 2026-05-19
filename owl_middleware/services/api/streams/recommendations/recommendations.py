@@ -1,5 +1,6 @@
 from typing import Optional, Callable, Dict, Any, List
 import uuid
+import asyncio
 from fastbot.logger.logger import Logger
 
 from .client import SSEClient
@@ -11,6 +12,10 @@ class RecommendationStream:
         self.client: Optional[SSEClient] = None
         self._paths_handlers: List[Callable] = []
         self._complete_handlers: List[Callable] = []
+        self._is_alive = True
+
+    def is_alive(self) -> bool:
+        return self._is_alive and self.client is not None and self.client.running
 
     def on_paths(self, handler: Callable[[str, str, List[str]], None]):
         self._paths_handlers.append(handler)
@@ -42,6 +47,7 @@ class RecommendationStream:
 
     def _handle_end(self):
         Logger.info("Recommendation stream completed")
+        self._is_alive = False
 
         for handler in self._complete_handlers:
             try:
@@ -49,38 +55,43 @@ class RecommendationStream:
             except Exception as e:
                 Logger.error(f"Error in complete handler: {e}")
 
+    def _handle_error(self, error: Exception):
+        Logger.error(f"SSE error: {error}")
+        self._is_alive = False
+
     async def connect(
         self, user_id: str, container_id: str, headers: Optional[Dict] = None
     ):
-        url = f"{self.base_url}/recommendations/stream"
+        url = f"{self.base_url}/recommendations/stream?user_id={user_id}&container_id={container_id}"
 
         if headers is None:
             headers = {}
 
-        params = f"?user_id={user_id}&container_id={container_id}"
-        url_with_params = url + params
-
-        self.client = SSEClient(url_with_params)
+        self.client = SSEClient(url)
 
         Logger.info("CONNECT TO STREAM")
 
         self.client.on_data(self._handle_data)
         self.client.on_end(self._handle_end)
+        self.client.on_error(self._handle_error)
 
         await self.client.start(headers)
+        self._is_alive = True
 
         return self
 
     async def close(self):
+        self._is_alive = False
         if self.client:
             await self.client.close()
+            self.client = None
 
 
 class RecommendationStreamManager:
     def __init__(self, base_url: str):
         self.base_url = base_url
         self.stream: Optional[RecommendationStream] = None
-        self.listeners: Dict[str, List[Callable]] = {}
+        self.listeners: Dict[str, Dict[str, Callable]] = {}
         self.user_container_key: Optional[str] = None
 
     async def subscribe(
@@ -101,21 +112,47 @@ class RecommendationStreamManager:
 
         listener_id = str(uuid.uuid4())
         self.listeners[listener_id] = {"on_paths": on_paths, "on_complete": on_complete}
+
+        Logger.info(f"Subscribed listener {listener_id} for {key}")
         return listener_id
 
+    async def unsubscribe(self, listener_id: str):
+        if listener_id in self.listeners:
+            del self.listeners[listener_id]
+            Logger.info(f"Unsubscribed listener {listener_id}")
+
     def _broadcast_paths(self, container_id: str, user_id: str, paths: List[str]):
-        """Шлем всем подписанным клиентам"""
-        for listener in self.listeners.values():
+        to_remove = []
+        for listener_id, listener in self.listeners.items():
             try:
-                listener["on_paths"](container_id, user_id, paths)
-            except:
-                pass
+                if "on_paths" in listener:
+                    listener["on_paths"](container_id, user_id, paths)
+            except Exception as e:
+                Logger.error(f"Error broadcasting paths to {listener_id}: {e}")
+                to_remove.append(listener_id)
+
+        for listener_id in to_remove:
+            del self.listeners[listener_id]
 
     def _broadcast_complete(self):
-        """Шлем всем завершение"""
-        for listener in self.listeners.values():
+        to_remove = []
+        for listener_id, listener in self.listeners.items():
             try:
-                listener["on_complete"]()
-            except:
-                pass
-        self.listeners.clear()
+                if "on_complete" in listener:
+                    listener["on_complete"]()
+            except Exception as e:
+                Logger.error(f"Error broadcasting complete to {listener_id}: {e}")
+                to_remove.append(listener_id)
+
+        for listener_id in to_remove:
+            del self.listeners[listener_id]
+
+        if not self.listeners and self.stream:
+            asyncio.create_task(self._cleanup_stream())
+
+    async def _cleanup_stream(self):
+        await asyncio.sleep(5)
+        if not self.listeners and self.stream:
+            await self.stream.close()
+            self.stream = None
+            self.user_container_key = None

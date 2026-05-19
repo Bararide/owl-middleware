@@ -15,16 +15,16 @@ logger = logging.getLogger(__name__)
 @inject("container_service")
 @inject("auth_service")
 async def semantic_search(
-    request: dict,
-    req: Request,
+    request: Request,
     api_service: ApiService,
     container_service: ContainerService,
     auth_service: AuthService,
 ):
     user = await get_current_user_from_request(request, auth_service)
 
-    query = request.get("query", "").strip()
-    limit = request.get("limit", 10)
+    body = await request.json()
+    query = body.get("query", "").strip()
+    limit = body.get("limit", 10)
 
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
@@ -76,21 +76,7 @@ async def get_semantic_graph(
     container_service: ContainerService,
     auth_service: AuthService,
 ):
-    token = None
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = request.query_params.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    current_user = user_result.unwrap()
+    user = await get_current_user_from_request(request, auth_service)
 
     container_id = request.query_params.get("container_id")
     if not container_id:
@@ -102,16 +88,12 @@ async def get_semantic_graph(
 
     container = container_result.unwrap()
 
-    maybe_graph = await api_service.containers.get_semantic_graph(
-        current_user, container
-    )
+    maybe_graph = await api_service.containers.get_semantic_graph(user, container)
 
     if maybe_graph.is_err():
         raise HTTPException(
             status_code=500,
             detail=f"get semantic graph error: {maybe_graph.unwrap_err()}",
         )
-
-    # Logger.info(f"{maybe_graph.unwrap()}")
 
     return {"data": maybe_graph.unwrap()}
