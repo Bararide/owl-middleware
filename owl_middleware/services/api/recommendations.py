@@ -20,6 +20,7 @@ class RecommendationHandler:
         self.current_container_id: Optional[str] = None
         self._reconnect_task: Optional[asyncio.Task] = None
         self._is_reconnecting = False
+        self._current_stream_id: Optional[str] = None
 
     @result_try
     async def get_recommendations_stream(
@@ -36,6 +37,8 @@ class RecommendationHandler:
             user_id, container_id, on_paths, on_complete
         )
 
+        self._current_stream_id = stream_id
+
         if self._reconnect_task is None or self._reconnect_task.done():
             self._reconnect_task = asyncio.create_task(
                 self._keep_alive(user_id, container_id)
@@ -44,20 +47,24 @@ class RecommendationHandler:
         return Ok(stream_id)
 
     async def _keep_alive(self, user_id: str, container_id: str):
-        """Фоновая задача для поддержания соединения"""
+        consecutive_failures = 0
         while True:
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
 
             stream = self.stream_manager.stream
             if stream is None:
                 continue
 
             if not stream.is_alive():
-                Logger.warning("SSE stream is dead, recreating...")
-                await self._recreate_stream(user_id, container_id)
+                consecutive_failures += 1
+                if consecutive_failures >= 2:
+                    Logger.warning("SSE stream is dead, recreating immediately...")
+                    await self._recreate_stream(user_id, container_id)
+                    consecutive_failures = 0
+            else:
+                consecutive_failures = 0
 
     async def _recreate_stream(self, user_id: str, container_id: str):
-        """Пересоздание SSE потока"""
         if self._is_reconnecting:
             return
 
@@ -80,6 +87,24 @@ class RecommendationHandler:
             Logger.error(f"Failed to recreate SSE stream: {e}")
         finally:
             self._is_reconnecting = False
+
+    async def reset(self):
+        """Полный сброс для нового WebSocket соединения"""
+        Logger.info("Resetting RecommendationHandler for new connection")
+
+        if self._current_stream_id and self._current_stream_id in self.active_streams:
+            self.active_streams[self._current_stream_id].cancel()
+
+        if self._reconnect_task and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+
+        await self.stream_manager.reset()
+
+        self.active_streams.clear()
+        self.stream_clients.clear()
+        self._current_stream_id = None
+        self._reconnect_task = None
+        self._is_reconnecting = False
 
     @result_try
     async def close_stream(self, stream_id: str) -> Result[bool, Exception]:

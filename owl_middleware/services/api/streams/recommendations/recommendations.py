@@ -123,6 +123,7 @@ class RecommendationStreamManager:
             self.stream = None
         self.listeners.clear()
         self.user_container_key = None
+        Logger.info("RecommendationStreamManager reset completed")
 
     async def unsubscribe(self, listener_id: str):
         if listener_id in self.listeners:

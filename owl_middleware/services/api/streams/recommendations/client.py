@@ -19,7 +19,8 @@ class SSEClient:
         self.task: Optional[asyncio.Task] = None
         self.should_reconnect = True
         self.reconnect_delay = 1
-        self.max_reconnect_delay = 30
+        self.max_reconnect_delay = 5
+        self.last_heartbeat = asyncio.get_event_loop().time()
 
     def on_data(self, handler: Callable[[Dict[str, Any]], None]):
         self.event_handlers["message"].append(handler)
@@ -43,12 +44,23 @@ class SSEClient:
             except Exception as e:
                 Logger.error(f"Error in SSE handler for {event}: {e}")
 
+    async def _heartbeat_check(self):
+        while self.running and self.should_reconnect:
+            await asyncio.sleep(60)
+            if asyncio.get_event_loop().time() - self.last_heartbeat > 90:
+                Logger.warning("No heartbeat received, reconnecting...")
+                self.running = False
+                break
+
     async def _connect_and_listen(self, headers: Optional[Dict] = None):
         delay = self.reconnect_delay
 
         while self.should_reconnect:
             try:
-                async with self.session.get(self.url, headers=headers) as response:
+                timeout = aiohttp.ClientTimeout(total=None, sock_read=10)
+                async with self.session.get(
+                    self.url, headers=headers, timeout=timeout
+                ) as response:
                     if response.status != 200:
                         error_msg = f"Failed to connect: {response.status}"
                         Logger.error(error_msg)
@@ -68,11 +80,17 @@ class SSEClient:
                     delay = self.reconnect_delay
                     self.running = True
 
+                    heartbeat_task = asyncio.create_task(self._heartbeat_check())
+
                     async for line in response.content:
                         if not self.running or not self.should_reconnect:
                             break
 
                         line = line.decode("utf-8").rstrip("\n")
+
+                        if line.startswith(": heartbeat"):
+                            self.last_heartbeat = asyncio.get_event_loop().time()
+                            continue
 
                         if line.startswith("data:"):
                             data_str = line[5:].lstrip()
@@ -89,8 +107,11 @@ class SSEClient:
                                 self.should_reconnect = False
                                 break
 
+                    heartbeat_task.cancel()
                     self.running = False
 
+            except asyncio.CancelledError:
+                break
             except aiohttp.ClientError as e:
                 Logger.error(f"SSE connection error: {e}")
                 self._emit("error", e)
