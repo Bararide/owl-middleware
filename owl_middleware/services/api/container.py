@@ -174,3 +174,16 @@ class ContainerHandler:
         return await self.client._make_request(
             "POST", "/container/status", json_data=payload
         )
+
+    @result_try
+    async def get_search_history(
+        self, user: User, container: Container
+    ) -> Result[List[Dict[str, Any]], Exception]:
+        payload = {
+            "user_id": str(user.id),
+            "container_id": str(container.id),
+        }
+
+        return await self.client._make_request(
+            "GET", "/container/search/history", json_data=payload
+        )
