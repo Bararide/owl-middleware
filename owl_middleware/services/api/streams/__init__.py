@@ -1,13 +1,17 @@
 from .recommendations import (
-    SSEClient,
-    SSEConnectionPool,
     RecommendationStream,
     RecommendationStreamManager,
 )
 
+from .logs import LogsStreamManager, LogsStream
+
+from .client import SSEClient, SSEConnectionPool
+
 __all__ = [
-    "SSEClient",
     "RecommendationStream",
     "RecommendationStreamManager",
+    "LogsStream",
+    "LogsStreamManager",
+    "SSEClient",
     "SSEConnectionPool",
 ]

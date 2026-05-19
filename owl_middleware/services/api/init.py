@@ -3,6 +3,7 @@ from .container import ContainerHandler
 from .file import FileHandler
 from .system import SystemHandler
 from .recommendations import RecommendationHandler
+from .logs import LogsHandler
 
 
 class ApiService:
@@ -12,6 +13,7 @@ class ApiService:
         self.files = FileHandler(self.client)
         self.system = SystemHandler(self.client)
         self.recommendations = RecommendationHandler(self.client, base_url)
+        self.logs = LogsHandler(self.client, base_url)
 
     async def __aenter__(self):
         await self.client.connect()

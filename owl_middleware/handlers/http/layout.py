@@ -1,7 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastbot.logger.logger import Logger
-import json
 import asyncio
 
 router = APIRouter(tags=["websocket"])
@@ -43,6 +42,7 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     await api_service.recommendations.stream_manager.reset()
+    await api_service.logs.stream_manager.reset()
 
     await ws_manager.connect(websocket, container_id, str(current_user.tg_id))
 
@@ -50,6 +50,9 @@ async def websocket_endpoint(websocket: WebSocket):
     recommendation_task = None
     sent_paths = set()
     recommendation_queue = None
+
+    logs_stream_id = None
+    logs_task = None
 
     connected_msg = {
         "type": "connected",
@@ -67,6 +70,16 @@ async def websocket_endpoint(websocket: WebSocket):
                 asyncio.create_task(
                     api_service.recommendations.close_stream(recommendation_stream_id)
                 )
+            except:
+                pass
+
+    def cleanup_logs():
+        nonlocal logs_task, logs_stream_id
+        if logs_task and not logs_task.done():
+            logs_task.cancel()
+        if logs_stream_id:
+            try:
+                asyncio.create_task(api_service.logs.close_stream(logs_stream_id))
             except:
                 pass
 
@@ -326,6 +339,36 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     recommendation_task = asyncio.create_task(send_recommendations())
 
+            elif action == "get_logs":
+                cleanup_logs()
+
+                def on_log(log_message: str):
+                    asyncio.create_task(
+                        websocket.send_json(
+                            {
+                                "type": "log_message",
+                                "request_id": request_id,
+                                "data": {"message": log_message},
+                            }
+                        )
+                    )
+
+                result = await api_service.logs.get_logs_stream(
+                    container_id=container_id,
+                    on_log=on_log,
+                )
+
+                if result.is_err():
+                    await websocket.send_json(
+                        {
+                            "type": "logs_error",
+                            "request_id": request_id,
+                            "error": str(result.unwrap_err()),
+                        }
+                    )
+                else:
+                    logs_stream_id = result.unwrap()
+
             elif action == "subscribe_to_graph_updates":
                 await ws_manager.subscribe(websocket, "graph_updates")
                 await websocket.send_json(
@@ -370,6 +413,28 @@ async def websocket_endpoint(websocket: WebSocket):
                     }
                 )
 
+            elif action == "subscribe_to_logs":
+                await ws_manager.subscribe(websocket, "logs")
+                await websocket.send_json(
+                    {
+                        "type": "subscribed",
+                        "request_id": request_id,
+                        "subscription": "logs",
+                        "container_id": container_id,
+                    }
+                )
+
+            elif action == "unsubscribe_from_logs":
+                await ws_manager.unsubscribe(websocket, "logs")
+                await websocket.send_json(
+                    {
+                        "type": "unsubscribed",
+                        "request_id": request_id,
+                        "subscription": "logs",
+                        "container_id": container_id,
+                    }
+                )
+
             else:
                 await websocket.send_json(
                     {
@@ -385,5 +450,6 @@ async def websocket_endpoint(websocket: WebSocket):
         Logger.error(f"=== WebSocket loop error: {type(e).__name__}: {e} ===")
     finally:
         cleanup_recommendations()
+        cleanup_logs()
         ws_manager.disconnect(websocket)
         Logger.info("=== WebSocket cleanup done ===")

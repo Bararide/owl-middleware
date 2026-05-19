@@ -3,7 +3,7 @@ import uuid
 import asyncio
 from fastbot.logger.logger import Logger
 
-from .client import SSEClient
+from ..client import SSEClient
 
 
 class RecommendationStream:
@@ -69,8 +69,6 @@ class RecommendationStream:
 
         self.client = SSEClient(url)
 
-        Logger.info("CONNECT TO STREAM")
-
         self.client.on_data(self._handle_data)
         self.client.on_end(self._handle_end)
         self.client.on_error(self._handle_error)
@@ -117,7 +115,6 @@ class RecommendationStreamManager:
         return listener_id
 
     async def reset(self):
-        """Полный сброс менеджера"""
         if self.stream:
             await self.stream.close()
             self.stream = None

@@ -89,7 +89,6 @@ class RecommendationHandler:
             self._is_reconnecting = False
 
     async def reset(self):
-        """Полный сброс для нового WebSocket соединения"""
         Logger.info("Resetting RecommendationHandler for new connection")
 
         if self._current_stream_id and self._current_stream_id in self.active_streams:
@@ -123,12 +122,12 @@ class RecommendationHandler:
 
     @result_try
     async def get_recommendations_blocking(
-        self, user_id: str, container_id: str, timeout: int = 30
+        self, user_id: str, container_id: str, timeout: int = 20
     ) -> Result[List[str], Exception]:
         result_paths = []
         completed = asyncio.Event()
         retry_count = 0
-        max_retries = 3
+        max_retries = 1
 
         while retry_count < max_retries:
             try:
