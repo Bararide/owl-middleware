@@ -19,7 +19,7 @@ class SSEClient:
         self.task: Optional[asyncio.Task] = None
         self.should_reconnect = True
         self.reconnect_delay = 1
-        self.max_reconnect_delay = 5
+        self.max_reconnect_delay = 20
         self.last_heartbeat = asyncio.get_event_loop().time()
 
     def on_data(self, handler: Callable[[Dict[str, Any]], None]):
@@ -57,7 +57,7 @@ class SSEClient:
 
         while self.should_reconnect:
             try:
-                timeout = aiohttp.ClientTimeout(total=None, sock_read=10)
+                timeout = aiohttp.ClientTimeout(total=None, sock_read=100)
                 async with self.session.get(
                     self.url, headers=headers, timeout=timeout
                 ) as response:
