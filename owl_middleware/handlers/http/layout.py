@@ -2,6 +2,7 @@ from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastbot.logger.logger import Logger
 import json
+import asyncio
 
 router = APIRouter(tags=["websocket"])
 
@@ -43,12 +44,29 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await ws_manager.connect(websocket, container_id, str(current_user.tg_id))
 
+    recommendation_stream_id = None
+    recommendation_task = None
+    sent_paths = set()
+    recommendation_queue = None
+
     connected_msg = {
         "type": "connected",
         "container_id": container_id,
         "user_id": str(current_user.tg_id),
     }
     await websocket.send_json(connected_msg)
+
+    def cleanup_recommendations():
+        nonlocal recommendation_task, recommendation_stream_id
+        if recommendation_task and not recommendation_task.done():
+            recommendation_task.cancel()
+        if recommendation_stream_id:
+            try:
+                asyncio.create_task(
+                    api_service.recommendations.close_stream(recommendation_stream_id)
+                )
+            except:
+                pass
 
     try:
         while True:
@@ -58,6 +76,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
             if action == "ping":
                 pong_msg = {"type": "pong", "timestamp": datetime.now().isoformat()}
+                if request_id:
+                    pong_msg["request_id"] = request_id
                 await websocket.send_json(pong_msg)
 
             elif action == "get_graph_data":
@@ -221,20 +241,129 @@ async def websocket_endpoint(websocket: WebSocket):
                         }
                     )
 
+            elif action == "get_recommendations":
+                cleanup_recommendations()
+                sent_paths.clear()
+                recommendation_queue = asyncio.Queue()
+                timeout = message.get("timeout", 30)
+
+                def on_paths(container_id: str, user_id: str, paths: list):
+                    new_paths = [p for p in paths if p not in sent_paths]
+                    if new_paths:
+                        sent_paths.update(new_paths)
+                        asyncio.create_task(
+                            recommendation_queue.put(
+                                {
+                                    "type": "recommendations_update",
+                                    "data": {
+                                        "paths": new_paths,
+                                        "total_paths": list(sent_paths),
+                                    },
+                                }
+                            )
+                        )
+
+                def on_complete():
+                    asyncio.create_task(
+                        recommendation_queue.put({"type": "recommendations_complete"})
+                    )
+
+                result = await api_service.recommendations.get_recommendations_stream(
+                    user_id=str(current_user.id),
+                    container_id=container_id,
+                    on_paths=on_paths,
+                    on_complete=on_complete,
+                )
+
+                if result.is_err():
+                    await websocket.send_json(
+                        {
+                            "type": "recommendations_data",
+                            "request_id": request_id,
+                            "error": str(result.unwrap_err()),
+                            "data": {"paths": []},
+                        }
+                    )
+                else:
+                    recommendation_stream_id = result.unwrap()
+
+                    async def send_recommendations():
+                        try:
+                            while True:
+                                try:
+                                    msg = await asyncio.wait_for(
+                                        recommendation_queue.get(), timeout=timeout
+                                    )
+                                    if msg["type"] == "recommendations_update":
+                                        await websocket.send_json(
+                                            {
+                                                "type": "recommendations_update",
+                                                "request_id": request_id,
+                                                "data": msg["data"],
+                                            }
+                                        )
+                                    elif msg["type"] == "recommendations_complete":
+                                        await websocket.send_json(
+                                            {
+                                                "type": "recommendations_data",
+                                                "request_id": request_id,
+                                                "data": {"paths": list(sent_paths)},
+                                            }
+                                        )
+                                        await websocket.send_json(
+                                            {
+                                                "type": "recommendations_complete",
+                                                "request_id": request_id,
+                                            }
+                                        )
+                                        break
+                                except asyncio.TimeoutError:
+                                    continue
+                        except asyncio.CancelledError:
+                            pass
+
+                    recommendation_task = asyncio.create_task(send_recommendations())
+
             elif action == "subscribe_to_graph_updates":
+                await ws_manager.subscribe(websocket, "graph_updates")
                 await websocket.send_json(
                     {
                         "type": "subscribed",
                         "request_id": request_id,
+                        "subscription": "graph_updates",
                         "container_id": container_id,
                     }
                 )
 
             elif action == "unsubscribe_from_graph_updates":
+                await ws_manager.unsubscribe(websocket, "graph_updates")
                 await websocket.send_json(
                     {
                         "type": "unsubscribed",
                         "request_id": request_id,
+                        "subscription": "graph_updates",
+                        "container_id": container_id,
+                    }
+                )
+
+            elif action == "subscribe_to_recommendations":
+                await ws_manager.subscribe(websocket, "recommendations")
+                await websocket.send_json(
+                    {
+                        "type": "subscribed",
+                        "request_id": request_id,
+                        "subscription": "recommendations",
+                        "container_id": container_id,
+                    }
+                )
+
+            elif action == "unsubscribe_from_recommendations":
+                await ws_manager.unsubscribe(websocket, "recommendations")
+                await websocket.send_json(
+                    {
+                        "type": "unsubscribed",
+                        "request_id": request_id,
+                        "subscription": "recommendations",
                         "container_id": container_id,
                     }
                 )
@@ -253,5 +382,6 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         Logger.error(f"=== WebSocket loop error: {type(e).__name__}: {e} ===")
     finally:
+        cleanup_recommendations()
         ws_manager.disconnect(websocket)
         Logger.info("=== WebSocket cleanup done ===")
