@@ -43,7 +43,7 @@ class RecommendationHandler:
 
     async def _monitor_stream(self, stream_id: str, user_id: str, container_id: str):
         while stream_id in self.stream_manager.listeners:
-            await asyncio.sleep(30)
+            await asyncio.sleep(1)
 
             stream = self.stream_manager.stream
             if stream and not stream.is_alive():
