@@ -5,7 +5,7 @@ from .recommendations import (
 
 from .logs import LogsStreamManager, LogsStream
 
-from .client import SSEClient, SSEConnectionPool
+from .client import SSEClient
 
 __all__ = [
     "RecommendationStream",
@@ -13,5 +13,4 @@ __all__ = [
     "LogsStream",
     "LogsStreamManager",
     "SSEClient",
-    "SSEConnectionPool",
 ]
