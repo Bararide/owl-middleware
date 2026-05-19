@@ -3,7 +3,10 @@ from typing import List, Dict, Optional
 from fastbot.core import Result, result_try, Ok, Err
 from fastbot.logger.logger import Logger
 from .client import ApiClient
-from .streams.recommendations.recommendations import RecommendationStreamManager
+from .streams.recommendations.recommendations import (
+    RecommendationStream,
+    RecommendationStreamManager,
+)
 import aiohttp
 
 
@@ -13,6 +16,8 @@ class RecommendationHandler:
         self.stream_manager = RecommendationStreamManager(base_url)
         self.active_streams: Dict[str, asyncio.Task] = {}
         self.stream_clients: Dict[str, aiohttp.ClientSession] = {}
+        self.current_user_id: Optional[str] = None
+        self.current_container_id: Optional[str] = None
 
     @result_try
     async def get_recommendations_stream(
@@ -22,11 +27,46 @@ class RecommendationHandler:
         on_paths: Optional[callable] = None,
         on_complete: Optional[callable] = None,
     ) -> Result[str, Exception]:
+        self.current_user_id = user_id
+        self.current_container_id = container_id
+
         stream_id = await self.stream_manager.subscribe(
             user_id, container_id, on_paths, on_complete
         )
 
+        reconnect_task = asyncio.create_task(
+            self._monitor_stream(stream_id, user_id, container_id)
+        )
+        self.active_streams[stream_id] = reconnect_task
+
         return Ok(stream_id)
+
+    async def _monitor_stream(self, stream_id: str, user_id: str, container_id: str):
+        while stream_id in self.stream_manager.listeners:
+            await asyncio.sleep(30)
+
+            stream = self.stream_manager.stream
+            if stream and not stream.is_alive():
+                Logger.warning(f"Stream {stream_id} dead, reconnecting...")
+
+                try:
+                    if self.stream_manager.stream:
+                        await self.stream_manager.stream.close()
+
+                    self.stream_manager.stream = RecommendationStream(
+                        self.stream_manager.base_url
+                    )
+                    await self.stream_manager.stream.connect(user_id, container_id)
+                    self.stream_manager.stream.on_paths(
+                        self.stream_manager._broadcast_paths
+                    )
+                    self.stream_manager.stream.on_complete(
+                        self.stream_manager._broadcast_complete
+                    )
+
+                    Logger.info(f"Stream {stream_id} reconnected")
+                except Exception as e:
+                    Logger.error(f"Failed to reconnect stream {stream_id}: {e}")
 
     @result_try
     async def close_stream(self, stream_id: str) -> Result[bool, Exception]:

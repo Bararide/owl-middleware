@@ -7,8 +7,6 @@ from fastbot.logger.logger import Logger
 
 
 class SSEClient:
-    """Клиент для обработки Server-Sent Events с автоматическим переподключением"""
-
     def __init__(self, url: str, session: Optional[aiohttp.ClientSession] = None):
         self.url = url
         self.session = session or aiohttp.ClientSession()
@@ -16,65 +14,62 @@ class SSEClient:
             "message": [],
             "end": [],
             "error": [],
-            "reconnected": [],
         }
         self.running = False
         self.task: Optional[asyncio.Task] = None
-        self.reconnect_attempts = 0
-        self.max_reconnect_attempts = 5
+        self.should_reconnect = True
         self.reconnect_delay = 1
-
-    def on(self, event: str, handler: Callable):
-        if event not in self.event_handlers:
-            self.event_handlers[event] = []
-        self.event_handlers[event].append(handler)
-        return self
+        self.max_reconnect_delay = 30
 
     def on_data(self, handler: Callable[[Dict[str, Any]], None]):
-        return self.on("message", handler)
+        self.event_handlers["message"].append(handler)
+        return self
 
     def on_end(self, handler: Callable[[], None]):
-        return self.on("end", handler)
+        self.event_handlers["end"].append(handler)
+        return self
 
     def on_error(self, handler: Callable[[Exception], None]):
-        return self.on("error", handler)
-
-    def on_reconnected(self, handler: Callable[[], None]):
-        return self.on("reconnected", handler)
+        self.event_handlers["error"].append(handler)
+        return self
 
     def _emit(self, event: str, data: Any = None):
-        if event in self.event_handlers:
-            for handler in self.event_handlers[event]:
-                try:
-                    if data is not None:
-                        handler(data)
-                    else:
-                        handler()
-                except Exception as e:
-                    Logger.error(f"Error in SSE handler for {event}: {e}")
+        for handler in self.event_handlers.get(event, []):
+            try:
+                if data is not None:
+                    handler(data)
+                else:
+                    handler()
+            except Exception as e:
+                Logger.error(f"Error in SSE handler for {event}: {e}")
 
-    async def connect(self, headers: Optional[Dict] = None) -> Result[bool, Exception]:
-        while self.reconnect_attempts < self.max_reconnect_attempts:
+    async def _connect_and_listen(self, headers: Optional[Dict] = None):
+        delay = self.reconnect_delay
+
+        while self.should_reconnect:
             try:
                 async with self.session.get(self.url, headers=headers) as response:
                     if response.status != 200:
                         error_msg = f"Failed to connect: {response.status}"
+                        Logger.error(error_msg)
                         self._emit("error", Exception(error_msg))
-                        raise Exception(error_msg)
 
-                    if self.reconnect_attempts > 0:
-                        Logger.info(
-                            f"SSE reconnected after {self.reconnect_attempts} attempts"
-                        )
-                        self._emit("reconnected")
-                        self.reconnect_attempts = 0
-                    else:
-                        Logger.info(f"SSE connected to {self.url}")
+                        if not self.should_reconnect:
+                            break
 
+                        await asyncio.sleep(delay)
+                        delay = min(delay * 2, self.max_reconnect_delay)
+                        continue
+
+                    Logger.info(f"SSE connected to {self.url}")
+                    if delay > self.reconnect_delay:
+                        Logger.info(f"SSE reconnected after {delay}s delay")
+
+                    delay = self.reconnect_delay
                     self.running = True
 
                     async for line in response.content:
-                        if not self.running:
+                        if not self.running or not self.should_reconnect:
                             break
 
                         line = line.decode("utf-8").rstrip("\n")
@@ -91,41 +86,33 @@ class SSEClient:
                             event_name = line[6:].lstrip()
                             if event_name == "end":
                                 self._emit("end")
-                                return Ok(True)
+                                self.should_reconnect = False
+                                break
 
-                        elif line.startswith(":"):
-                            continue
-
-                    return Ok(True)
+                    self.running = False
 
             except aiohttp.ClientError as e:
                 Logger.error(f"SSE connection error: {e}")
                 self._emit("error", e)
 
-                if self.reconnect_attempts >= self.max_reconnect_attempts - 1:
-                    Logger.error("Max reconnect attempts reached")
-                    return Err(e)
+                if not self.should_reconnect:
+                    break
 
-                self.reconnect_attempts += 1
-                delay = self.reconnect_delay * (2 ** (self.reconnect_attempts - 1))
-                Logger.info(
-                    f"Reconnecting in {delay}s (attempt {self.reconnect_attempts}/{self.max_reconnect_attempts})"
-                )
+                Logger.info(f"Reconnecting in {delay}s...")
                 await asyncio.sleep(delay)
+                delay = min(delay * 2, self.max_reconnect_delay)
 
             except Exception as e:
                 Logger.error(f"SSE error: {e}")
                 self._emit("error", e)
-                return Err(e)
-            finally:
-                self.running = False
-
-        return Err(Exception("Max reconnect attempts exceeded"))
+                break
 
     async def start(self, headers: Optional[Dict] = None):
-        self.task = asyncio.create_task(self.connect(headers))
+        self.should_reconnect = True
+        self.task = asyncio.create_task(self._connect_and_listen(headers))
 
     async def stop(self):
+        self.should_reconnect = False
         self.running = False
         if self.task:
             self.task.cancel()
