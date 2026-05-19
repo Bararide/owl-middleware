@@ -19,7 +19,7 @@ class SSEClient:
         self.task: Optional[asyncio.Task] = None
         self.should_reconnect = True
         self.reconnect_delay = 1
-        self.max_reconnect_delay = 20
+        self.max_reconnect_delay = 1
         self.last_heartbeat = asyncio.get_event_loop().time()
 
     def on_data(self, handler: Callable[[Dict[str, Any]], None]):
