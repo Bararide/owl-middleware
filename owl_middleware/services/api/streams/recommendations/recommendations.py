@@ -119,9 +119,7 @@ class RecommendationStreamManager:
             if self.stream:
                 await self.stream.close()
             self.stream = RecommendationStream(self.base_url)
-            self.stream.on_reconnect(
-                lambda: asyncio.create_task(self._trigger_reconnect())
-            )
+            self.stream.on_reconnect(lambda: self._trigger_reconnect())
             await self.stream.connect(user_id, container_id)
             self.user_container_key = key
             self.stream.on_paths(self._broadcast_paths)
