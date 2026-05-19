@@ -21,39 +21,18 @@ async def semantic_search(
     container_service: ContainerService,
     auth_service: AuthService,
 ):
-    token = None
-    auth_header = req.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = req.query_params.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    user_result = await auth_service.get_user_by_token(token)
-    if user_result.is_err():
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    current_user = user_result.unwrap()
+    user = await get_current_user_from_request(request, auth_service)
 
     query = request.get("query", "").strip()
-    container_id = request.get("container_id")
     limit = request.get("limit", 10)
 
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
-    if not container_id:
-        raise HTTPException(status_code=400, detail="Container ID is required")
 
-    container_result = await container_service.get_container(container_id)
-    if container_result.is_err() or not container_result.unwrap():
-        raise HTTPException(status_code=404, detail="Container not found")
-
-    container = container_result.unwrap()
+    container = await get_current_container(request, container_service)
 
     search_result = await api_service.containers.semantic_search(
-        query, current_user, container, limit=limit
+        query, user, container, limit=limit
     )
     if search_result.is_err():
         raise HTTPException(
