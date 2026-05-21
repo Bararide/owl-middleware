@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from fastbot.decorators import inject
 from fastbot.logger.logger import Logger
-from .dependencies import get_current_user_from_request
+from .dependencies import get_current_user_from_request, get_current_container
 from services import (
     ContainerService,
     ApiService,
@@ -54,11 +54,8 @@ async def upload_file_in_container(
 ):
     current_user = await get_current_user_from_request(request, auth_service)
 
-    container_result = await container_service.get_container(container_id)
-    if container_result.is_err():
-        raise HTTPException(status_code=500, detail="Error accessing container")
+    container = await get_current_container(request, container_service)
 
-    container = container_result.unwrap()
     if not container:
         raise HTTPException(status_code=404, detail="Container not found")
 
