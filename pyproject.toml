@@ -25,7 +25,7 @@ email-validator = "^2.3.0"
 pyjwt = "^2.10.1"
 langchain = {extras = ["mistralai"], version = "^1.1.0"}
 langchain-community = "<0.4.1"
-openai = "^2.8.1"
+openai = "^2.37.0"
 pillow = "^12.0.0"
 python-multipart = "^0.0.20"
 returns = "^0.26.0"
