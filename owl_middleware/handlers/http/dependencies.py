@@ -61,9 +61,9 @@ async def get_container_status(
 
 
 async def get_container_stats(
-    container_service: ContainerService, container_id: str
+    container_service: ContainerService, user_id: str, container_id: str
 ) -> dict:
-    stats_result = await container_service.get_container_stats(container_id)
+    stats_result = await container_service.get_container_stats(user_id, container_id)
     if stats_result.is_ok():
         stats = stats_result.unwrap()
         return {

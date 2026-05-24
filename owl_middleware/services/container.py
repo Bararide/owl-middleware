@@ -179,7 +179,7 @@ class ContainerService:
 
     @result_try
     async def get_container_stats(
-        self, container_id: str
+        self, user_id: str, container_id: str
     ) -> Result[Dict[str, Any], Exception]:
         container_result = await self.get_container(container_id)
         if container_result.is_err():
@@ -188,7 +188,10 @@ class ContainerService:
         container = container_result.unwrap()
         files = await self.file_service.get_files_by_container(container.id)
 
-        total_size = sum(file.size or 0 for file in files)
+        total_size = await self.api_service.containers.get_container_memory(
+            user_id, container_id
+        )
+
         storage_usage_percent = (
             (total_size / container.tariff.storage_quota * 100)
             if container.tariff.storage_quota > 0
@@ -197,7 +200,7 @@ class ContainerService:
 
         stats = {
             "container_id": container_id,
-            "user_id": container.user_id,
+            "user_id": str(user_id),
             "total_files": len(files),
             "total_size": total_size,
             "storage_quota": container.tariff.storage_quota,
