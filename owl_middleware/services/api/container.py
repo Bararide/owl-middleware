@@ -169,8 +169,6 @@ class ContainerHandler:
     ) -> Result[Dict[str, Any], Exception]:
         payload = {"user_id": str(user_id), "container_ids": container_ids}
 
-        Logger.info(payload)
-
         return await self.client._make_request(
             "POST", "/container/status", json_data=payload
         )
@@ -186,4 +184,14 @@ class ContainerHandler:
 
         return await self.client._make_request(
             "GET", "/container/search/history", json_data=payload
+        )
+
+    @result_try
+    async def get_container_memory(
+        self, user_id: str, container_ids: List
+    ) -> Result[List[Dict[str, Any]], Exception]:
+        payload = {"user_id": str(user_id), "container_ids": container_ids}
+
+        return await self.client._make_request(
+            "POST", "/container/memory", json_data=payload
         )
