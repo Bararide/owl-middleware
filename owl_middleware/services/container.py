@@ -224,7 +224,6 @@ class ContainerService:
     async def check_container_limits(
         self, container_id: str
     ) -> Result[Dict[str, Any], Exception]:
-        """Проверка лимитов контейнера"""
         container_result = await self.get_container(container_id)
         if container_result.is_err():
             return container_result
