@@ -188,9 +188,17 @@ class ContainerService:
         container = container_result.unwrap()
         files = await self.file_service.get_files_by_container(container.id)
 
-        total_size = await self.api_service.containers.get_container_memory(
-            user_id, container_id
+        maybe_response = await self.api_service.containers.get_container_memory(
+            user_id, [container_id]
         )
+
+        total_size = 0
+        if maybe_response.is_ok():
+            response_data = maybe_response.unwrap()
+            if isinstance(response_data, dict) and "data" in response_data:
+                data_list = response_data["data"]
+                if data_list and len(data_list) > 0:
+                    total_size = data_list[0].get("memory_usage", 0)
 
         storage_usage_percent = (
             (total_size / container.tariff.storage_quota * 100)

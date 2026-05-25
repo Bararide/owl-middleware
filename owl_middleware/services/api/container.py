@@ -188,9 +188,10 @@ class ContainerHandler:
 
     @result_try
     async def get_container_memory(
-        self, user_id: str, container_ids: List
+        self, user_id: str, container_ids: List[str]
     ) -> Result[List[Dict[str, Any]], Exception]:
         payload = {"user_id": str(user_id), "container_ids": container_ids}
+        Logger.info(f"Payload: {payload}")
 
         return await self.client._make_request(
             "POST", "/container/memory", json_data=payload
