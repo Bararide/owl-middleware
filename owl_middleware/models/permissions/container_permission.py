@@ -2,6 +2,6 @@ from enum import Enum
 
 
 class ContainerPermission(str, Enum):
-    READ_ONLY = "read_only"
-    READ_WRITE = "read_write"
-    ADMIN = "admin"
+    read_only = "read_only"
+    read_write = "read_write"
+    admin = "admin"
