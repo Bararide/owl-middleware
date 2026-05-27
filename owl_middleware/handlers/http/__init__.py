@@ -9,6 +9,7 @@ from . import (
     search,
     groups,
     layout,
+    admin,
 )
 from fastapi import APIRouter
 
@@ -24,6 +25,7 @@ http_router.include_router(recommendations.router)
 http_router.include_router(search.router)
 http_router.include_router(groups.router)
 http_router.include_router(layout.router)
+http_router.include_router(admin.router)
 
 __all__ = [
     "auth",
@@ -36,5 +38,6 @@ __all__ = [
     "search",
     "groups",
     "layout",
+    "admin",
     "http_router",
 ]

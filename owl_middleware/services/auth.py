@@ -1,10 +1,11 @@
 import jwt
 import hashlib
-
+from typing import Optional, List
 from datetime import datetime, timedelta
-from fastbot.core import Result, result_try
+from fastbot.core import Result, result_try, Err, Ok
 from fastbot.logger import Logger
 from models import User, UserCreate
+from models.roles.user_role import UserRole
 
 
 class AuthService:
@@ -25,14 +26,12 @@ class AuthService:
 
     @result_try
     async def get_user(self, user_id: int) -> Result[User, Exception]:
-        Logger.error(f"{user_id}")
         user = await self.users.find_one({"id": user_id})
         return User(**user) if user else None
 
     @result_try
     async def get_user_by_tg_id(self, tg_id: int) -> Result[User, Exception]:
         user = await self.users.find_one({"tg_id": tg_id})
-        Logger.debug(User(**user) if user else None)
         return User(**user) if user else None
 
     @result_try
@@ -83,6 +82,7 @@ class AuthService:
             first_name=user_data.get("first_name", "Unknown"),
             last_name=user_data.get("last_name"),
             auth_method="email",
+            role=UserRole.user,
         )
         return await self.create_user(user_create)
 
@@ -98,21 +98,72 @@ class AuthService:
     ) -> Result[User, Exception]:
         user_data = await self.users.find_one({"email": email})
         if not user_data:
-            return Result.Err(Exception("User not found"))
+            return Err(Exception("User not found"))
 
         if not self._verify_password(password, user_data.get("password_hash", "")):
-            return Result.Err(Exception("Invalid password"))
+            return Err(Exception("Invalid password"))
 
-        return Result.Ok(User(**user_data))
+        return Ok(User(**user_data))
+
+    @result_try
+    async def admin_login(self, email: str, password: str) -> Result[str, Exception]:
+        user_result = await self.authenticate_email(email, password)
+        if user_result.is_err():
+            return Err(user_result.unwrap_err())
+
+        user = user_result.unwrap()
+
+        if user.role not in [UserRole.admin, UserRole.super_admin]:
+            return Err(Exception("Access denied. Admin rights required."))
+
+        if not user.is_active:
+            return Err(Exception("Account is disabled. Contact administrator."))
+
+        token = self.generate_admin_token(user)
+        return Ok(token)
 
     def generate_jwt_token(self, user: User, expires_hours: int = 24) -> str:
         payload = {
             "user_id": user.id,
+            "role": user.role,
             "exp": datetime.utcnow() + timedelta(hours=expires_hours),
             "iat": datetime.utcnow(),
             "auth_method": getattr(user, "auth_method", "telegram"),
+            "type": "user_access",
         }
         return jwt.encode(payload, self.jwt_secret, algorithm=self.algorithm)
+
+    def generate_admin_token(self, user: User, expires_hours: int = 8) -> str:
+        payload = {
+            "user_id": user.id,
+            "email": user.email,
+            "username": user.username or user.first_name,
+            "role": user.role,
+            "permissions": getattr(
+                user, "permissions", self._get_default_permissions(user.role)
+            ),
+            "exp": datetime.utcnow() + timedelta(hours=expires_hours),
+            "iat": datetime.utcnow(),
+            "auth_method": getattr(user, "auth_method", "email"),
+            "type": "admin_access",
+        }
+        return jwt.encode(payload, self.jwt_secret, algorithm=self.algorithm)
+
+    def _get_default_permissions(self, role: UserRole) -> List[str]:
+        """Получение стандартных прав для роли"""
+        permissions_map = {
+            UserRole.user: ["read.own"],
+            UserRole.moderator: ["read.all", "edit.all"],
+            UserRole.admin: [
+                "read.all",
+                "edit.all",
+                "delete.all",
+                "users.read",
+                "users.edit",
+            ],
+            UserRole.super_admin: ["*"],
+        }
+        return permissions_map.get(role, ["read.own"])
 
     @result_try
     def verify_jwt_token(self, token: str):
@@ -128,7 +179,24 @@ class AuthService:
     async def get_user_by_token(self, token: str) -> Result[User, Exception]:
         payload_result = self.verify_jwt_token(token)
         if payload_result.is_err():
-            return Result.err(payload_result.unwrap_err())
+            return Err(payload_result.unwrap_err())
 
         payload = payload_result.unwrap()
         return await self.get_user(payload["user_id"])
+
+    @result_try
+    async def verify_admin_token(self, token: str) -> Result[dict, Exception]:
+        payload_result = self.verify_jwt_token(token)
+        if payload_result.is_err():
+            return Err(payload_result.unwrap_err())
+
+        payload = payload_result.unwrap()
+
+        if payload.get("type") != "admin_access":
+            return Err(Exception("Invalid token type"))
+
+        role = payload.get("role")
+        if role not in [UserRole.admin, UserRole.super_admin]:
+            return Err(Exception("Admin rights required"))
+
+        return Ok(payload)
