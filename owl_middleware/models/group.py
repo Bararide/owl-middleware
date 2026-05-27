@@ -1,11 +1,8 @@
-from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+
+from .base_group import BaseGroup
 
 
-class Group(BaseModel):
-    id: str
+class Group(BaseGroup):
     container_id: str
-    description: Optional[str] = None
     color: Optional[str] = "#ff9800"
-    created_at: Optional[datetime] = None
