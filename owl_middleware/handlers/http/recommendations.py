@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastbot.decorators import inject
 from services import ApiService, ContainerService, AuthService
 from models import User
+from models.roles.user_role import UserRole
 import logging
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -48,7 +49,10 @@ async def recommendations_stream(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     async def event_generator():

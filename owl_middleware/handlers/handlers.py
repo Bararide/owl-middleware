@@ -7,6 +7,7 @@ from fastbot.engine import ContextEngine
 from fastbot.engine import TemplateEngine
 from fastbot.logger import Logger
 from models import User
+from models.roles.user_role import UserRole
 from services import (
     AuthService,
     FileService,
@@ -979,7 +980,7 @@ async def handle_rebuild_index(
     api_service: ApiService,
     cen: ContextEngine,
 ):
-    if not user.is_admin:
+    if not user.role == UserRole.admin:
         return {
             "context": await cen.get("rebuild_index", error="Insufficient permissions")
         }
@@ -1120,7 +1121,7 @@ async def handle_delete_file(
 
     file = file_result.unwrap()
 
-    if file.user_id != user.tg_id and not user.is_admin:
+    if file.user_id != user.tg_id and not user.role == UserRole.admin:
         return {"context": await cen.get("delete_file", error="Access denied")}
 
     delete_result = await file_service.delete_file(file_id)
@@ -1146,8 +1147,7 @@ async def handle_service_status(
     api_service: ApiService,
     cen: ContextEngine,
 ):
-    """Команда для проверки статуса C++ сервиса"""
-    if not user.is_admin:
+    if not user.role == UserRole.admin:
         return await message.answer("❌ Insufficient permissions")
 
     health_result = await api_service.system.health_check()

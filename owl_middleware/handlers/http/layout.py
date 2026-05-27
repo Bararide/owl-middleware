@@ -3,6 +3,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastbot.logger.logger import Logger
 import asyncio
 
+from models.roles.user_role import UserRole
+
 router = APIRouter(tags=["websocket"])
 
 
@@ -37,7 +39,12 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1003, reason="Container not found")
         return
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
+
         await websocket.close(code=1003, reason="Access denied")
         return
 

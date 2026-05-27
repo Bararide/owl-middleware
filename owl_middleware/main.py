@@ -77,6 +77,8 @@ async def main() -> None:
         getenv("REDIS_HOST"), getenv("REDIS_PORT"), False
     )
 
+    user_group_service = services.UserGroupService(database_service)
+
     await redis_service.connect()
 
     text_service = services.TextService(getenv("MAX_FILE_SIZE"))
@@ -124,6 +126,7 @@ async def main() -> None:
     bot_builder.add_dependency("deepseek_agent_service", deepseek_agent_service)
     bot_builder.add_dependency("ocr_service", ocr_service)
     bot_builder.add_dependency("state_service", state_service)
+    bot_builder.add_dependency("user_group_service", user_group_service)
     bot_builder.add_dependency("ws_manager", ws_manager)
 
     bot_builder.add_dependency_resolver(models.User, resolvers.resolve_user)
@@ -201,6 +204,7 @@ async def main() -> None:
     bot.app.state.agent_service = agent_service
     bot.app.state.deepseek_agent_service = deepseek_agent_service
     bot.app.state.ocr_service = ocr_service
+    bot.app.state.user_group_service = user_group_service
     bot.app.state.ws_manager = ws_manager
     bot.app.state.user_resolver = resolvers.resolve_user
 

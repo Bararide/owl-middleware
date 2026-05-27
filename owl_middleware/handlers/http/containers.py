@@ -9,6 +9,7 @@ from .dependencies import (
 )
 from services import ContainerService, AuthService, ApiService
 from models import User, Container, Tariff, Label
+from models.roles.user_role import UserRole
 from datetime import datetime
 
 import traceback
@@ -199,7 +200,10 @@ async def get_container(
 
     container = container_result.unwrap()
 
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     return {"data": container.dict()}
@@ -247,7 +251,10 @@ async def get_container_metrics(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     metrics_result = await api_service.get_container_metrics(container_id)

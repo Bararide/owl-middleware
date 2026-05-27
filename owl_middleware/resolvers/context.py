@@ -1,4 +1,5 @@
 from models import User, File
+from models.roles.user_role import UserRole
 from fastbot.decorators import register_context
 from typing import List, Dict, Any
 
@@ -10,7 +11,7 @@ async def start_context(user: User):
     return {
         "user": user,
         "welcome_message": f"Добро пожаловать, {user.first_name}!",
-        "is_admin": user.is_admin,
+        "is_admin": user.role == UserRole.admin,
     }
 
 

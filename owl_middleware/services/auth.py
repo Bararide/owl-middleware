@@ -105,7 +105,7 @@ class AuthService:
 
         return Result.Ok(User(**user_data))
 
-    def generate_jwt_token(self, user, expires_hours: int = 24) -> str:
+    def generate_jwt_token(self, user: User, expires_hours: int = 24) -> str:
         payload = {
             "user_id": user.id,
             "exp": datetime.utcnow() + timedelta(hours=expires_hours),

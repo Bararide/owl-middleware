@@ -4,6 +4,8 @@ from fastbot.logger.logger import Logger
 from .dependencies import get_current_user_from_request
 from services import GroupService, AuthService, ContainerService, FileService
 
+from models.roles.user_role import UserRole
+
 import traceback
 
 router = APIRouter(prefix="/groups", tags=["groups"])
@@ -27,7 +29,10 @@ async def get_container_groups(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     groups_result = await group_service.get_groups_by_container(container_id)
@@ -58,7 +63,10 @@ async def create_group(
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
-        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        if (
+            container.user_id != str(current_user.tg_id)
+            and not current_user.role == UserRole.admin
+        ):
             raise HTTPException(status_code=403, detail="Access denied")
 
         name = body.get("name")
@@ -114,7 +122,10 @@ async def get_group(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     return {"data": group.dict()}
@@ -146,7 +157,10 @@ async def update_group(
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
-        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        if (
+            container.user_id != str(current_user.tg_id)
+            and not current_user.role == UserRole.admin
+        ):
             raise HTTPException(status_code=403, detail="Access denied")
 
         description = body.get("description")
@@ -198,7 +212,10 @@ async def delete_group(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     delete_result = await group_service.delete_group(group_id, group.container_id)
@@ -238,7 +255,10 @@ async def add_file_to_group(
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
-        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        if (
+            container.user_id != str(current_user.tg_id)
+            and not current_user.role == UserRole.admin
+        ):
             raise HTTPException(status_code=403, detail="Access denied")
 
         add_result = await group_service.add_file_to_group(file_id, group_id)
@@ -287,7 +307,10 @@ async def remove_file_from_group(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     remove_result = await group_service.remove_file_from_group(file_id, group_id)
@@ -324,7 +347,10 @@ async def get_group_files(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     files_result = await group_service.get_files_by_group(group_id)
@@ -364,7 +390,7 @@ async def get_file_groups(
             container = container_result.unwrap()
             if (
                 container.user_id != str(current_user.tg_id)
-                and not current_user.is_admin
+                and not current_user.role == UserRole.admin
             ):
                 raise HTTPException(status_code=403, detail="Access denied")
 
@@ -401,7 +427,10 @@ async def add_multiple_files_to_group(
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
-        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        if (
+            container.user_id != str(current_user.tg_id)
+            and not current_user.role == UserRole.admin
+        ):
             raise HTTPException(status_code=403, detail="Access denied")
 
         add_result = await group_service.add_multiple_files_to_group(file_ids, group_id)
@@ -451,7 +480,10 @@ async def remove_multiple_files_from_group(
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
-        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        if (
+            container.user_id != str(current_user.tg_id)
+            and not current_user.role == UserRole.admin
+        ):
             raise HTTPException(status_code=403, detail="Access denied")
 
         remove_result = await group_service.remove_multiple_files_from_group(
@@ -506,7 +538,10 @@ async def move_file_between_groups(
             raise HTTPException(status_code=404, detail="Container not found")
 
         container = container_result.unwrap()
-        if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+        if (
+            container.user_id != str(current_user.tg_id)
+            and not current_user.role == UserRole.admin
+        ):
             raise HTTPException(status_code=403, detail="Access denied")
 
         to_group_result = await group_service.get_group(to_group_id)
@@ -558,7 +593,10 @@ async def get_group_stats(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if container.user_id != str(current_user.tg_id) and not current_user.is_admin:
+    if (
+        container.user_id != str(current_user.tg_id)
+        and not current_user.role == UserRole.admin
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     stats_result = await group_service.get_group_stats(group_id)
