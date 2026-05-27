@@ -8,6 +8,7 @@ from .agent import AgentService
 from .groups import GroupService
 from .redis import RedisService
 from .ocr import Ocr
+from .user_group import UserGroupService
 
 from .api import ApiService
 
@@ -24,6 +25,7 @@ __all__ = [
     "TextService",
     "HanaValidator",
     "AgentService",
+    "UserGroupService",
     "Ocr",
     "State",
     "GroupService",

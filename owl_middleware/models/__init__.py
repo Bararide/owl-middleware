@@ -6,6 +6,9 @@ from .container import Container
 from .semantic_edge import SemanticEdge
 from .group import Group
 from .file2group import File2Group
+from .user_group import UserGroup
+from .container2group import Container2Group
+from .user2group import User2Group
 
 __all__ = [
     "User",
@@ -18,4 +21,7 @@ __all__ = [
     "SemanticEdge",
     "Group",
     "File2Group",
+    "UserGroup",
+    "Container2Group",
+    "User2Group",
 ]

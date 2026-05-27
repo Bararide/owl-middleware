@@ -4,6 +4,7 @@ from typing import List, Tuple
 from openai import OpenAI
 import base64
 import os
+import asyncio
 from PIL import Image, ImageDraw
 from fastbot.core import Ok, Err, Result
 from fastbot.logger.logger import Logger
@@ -150,8 +151,6 @@ class Ocr:
             Logger.info(f"Starting OCR for: {filename}, size: {len(file_data)} bytes")
 
             base64_image = base64.b64encode(file_data).decode("utf-8")
-
-            import asyncio
 
             result = await asyncio.get_event_loop().run_in_executor(
                 None, self._make_correct_ocr_request, base64_image
