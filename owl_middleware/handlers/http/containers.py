@@ -46,6 +46,36 @@ async def list_containers(
     return {"data": containers_data}
 
 
+@router.get("/admin/all")
+@inject("container_service")
+@inject("auth_service")
+@inject("api_service")
+async def list_all_containers_for_admin(
+    container_service: ContainerService,
+    auth_service: AuthService,
+    api_service: ApiService,
+    request: Request,
+):
+    current_user = await get_current_user_from_request(request, auth_service)
+
+    if current_user.role not in [UserRole.admin, UserRole.super_admin]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    containers_result = await container_service.get_all_containers()
+    if containers_result.is_err():
+        raise HTTPException(status_code=500, detail="Error fetching containers")
+
+    containers_data = []
+    for container in containers_result.unwrap():
+        stats = await get_container_stats(
+            container_service, str(current_user.id), container.id
+        )
+        status = await get_container_status(api_service, current_user.id, container.id)
+        containers_data.append(await container_to_response(container, stats, status))
+
+    return {"data": containers_data}
+
+
 @router.post("")
 @inject("container_service")
 @inject("auth_service")

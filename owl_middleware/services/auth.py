@@ -30,6 +30,14 @@ class AuthService:
         return User(**user) if user else None
 
     @result_try
+    async def get_all_users(self) -> Result[List[User], Exception]:
+        cursor = self.users.find({})
+        users = []
+        async for doc in cursor:
+            users.append(User(**doc))
+        return users
+
+    @result_try
     async def get_user_by_tg_id(self, tg_id: int) -> Result[User, Exception]:
         user = await self.users.find_one({"tg_id": tg_id})
         return User(**user) if user else None

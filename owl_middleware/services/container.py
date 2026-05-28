@@ -26,6 +26,14 @@ class ContainerService:
         )
 
     @result_try
+    async def get_all_containers(self) -> Result[List[Container], Exception]:
+        cursor = self.db_service.db["containers"].find({})
+        containers = []
+        async for doc in cursor:
+            containers.append(Container.from_dict(doc))
+        return containers
+
+    @result_try
     async def get_containers_by_user_id(
         self, user_id: str
     ) -> Result[List[Container], Exception]:

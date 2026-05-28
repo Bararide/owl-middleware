@@ -82,6 +82,25 @@ async def verify_admin_token(
     }
 
 
+@router.get("/users")
+@inject("auth_service")
+async def list_all_users(
+    auth_service: AuthService,
+    request: Request,
+):
+    current_user = await get_current_user_from_request(request, auth_service)
+
+    if current_user.role not in [UserRole.admin, UserRole.super_admin]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    users_result = await auth_service.get_all_users()
+    if users_result.is_err():
+        raise HTTPException(status_code=500, detail="Error fetching users")
+
+    users = users_result.unwrap()
+    return {"data": users}
+
+
 @router.post("/create-first-admin")
 @inject("auth_service")
 async def create_first_admin(
