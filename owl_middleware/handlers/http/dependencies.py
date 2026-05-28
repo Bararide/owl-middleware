@@ -28,6 +28,18 @@ async def get_current_user_from_request(
     return user_result.unwrap()
 
 
+async def get_tg_id_from_user_id(auth_service: AuthService, user_id: str) -> int:
+    """Получить tg_id по user_id из БД"""
+    try:
+        user_result = await auth_service.get_user(int(user_id))
+        if user_result.is_ok():
+            user = user_result.unwrap()
+            return user.tg_id or int(user_id)
+    except Exception as e:
+        Logger.error(f"Error getting tg_id for user_id {user_id}: {e}")
+    return int(user_id)
+
+
 async def get_current_container(
     request: Request, container_service: ContainerService
 ) -> Container:
@@ -61,9 +73,14 @@ async def get_container_status(
 
 
 async def get_container_stats(
-    container_service: ContainerService, user_id: str, container_id: str
+    container_service: ContainerService,
+    auth_service: AuthService,
+    user_id: str,
+    container_id: str,
 ) -> dict:
-    stats_result = await container_service.get_container_stats(user_id, container_id)
+    tg_id = await get_tg_id_from_user_id(auth_service, user_id)
+
+    stats_result = await container_service.get_container_stats(str(tg_id), container_id)
     if stats_result.is_ok():
         stats = stats_result.unwrap()
         return {
