@@ -68,7 +68,7 @@ async def list_all_containers_for_admin(
     containers_data = []
     for container in containers_result.unwrap():
         stats = await get_container_stats(
-            container_service, str(current_user.id), container.id
+            container_service, container.user_id, container.id
         )
         status = await get_container_status(api_service, current_user.id, container.id)
         containers_data.append(await container_to_response(container, stats, status))
