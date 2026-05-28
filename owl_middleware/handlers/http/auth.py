@@ -7,6 +7,8 @@ from models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# https://github.com/BenBE/deepbacksub
+
 
 @router.post("/register")
 @inject("auth_service")
