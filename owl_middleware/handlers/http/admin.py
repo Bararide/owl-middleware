@@ -98,7 +98,21 @@ async def list_all_users(
         raise HTTPException(status_code=500, detail="Error fetching users")
 
     users = users_result.unwrap()
-    return {"data": users}
+
+    users_data = []
+    for user in users:
+        users_data.append(
+            {
+                "id": str(user.id),
+                "name": user.username or user.first_name,
+                "email": user.email or "",
+                "role": user.role,
+                "tg_id": user.tg_id,
+                "is_active": user.is_active,
+            }
+        )
+
+    return {"data": users_data}
 
 
 @router.post("/create-first-admin")
