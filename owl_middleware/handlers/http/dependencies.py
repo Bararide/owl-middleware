@@ -67,30 +67,46 @@ async def get_container_stats(
     if stats_result.is_ok():
         stats = stats_result.unwrap()
         return {
-            "storage_usage_percent": stats["storage_usage_percent"],
-            "total_size": stats["total_size"],
+            "storage_usage_percent": stats.get("storage_usage_percent", 0),
+            "total_size": stats.get("total_size", 0),
         }
     return {"storage_usage_percent": 0, "total_size": 0}
 
 
 async def container_to_response(container: Container, stats: dict, status: str) -> dict:
     """Convert container model to API response"""
+    storage_quota_mb = container.tariff.storage_quota
+    storage_used = stats.get("total_size", 0)
+    storage_usage_percent = stats.get("storage_usage_percent", 0)
+
+    if storage_usage_percent == 0 and storage_quota_mb > 0:
+        storage_usage_percent = (storage_used / (storage_quota_mb * 1024 * 1024)) * 100
+
+    memory_usage = 0
+    if storage_quota_mb > 0:
+        memory_usage = storage_usage_percent / (storage_quota_mb * 1024) * 100
+    memory_usage = min(memory_usage, 100)
+
     return {
         "id": container.id,
         "status": status,
         "memory_limit": container.tariff.memory_limit,
-        "storage_quota": container.tariff.storage_quota,
+        "storage_quota": storage_quota_mb,
         "file_limit": container.tariff.file_limit,
-        "env_label": container.env_label,
-        "type_label": container.type_label,
+        "env_label": {
+            "key": container.env_label.key,
+            "value": container.env_label.value,
+        },
+        "type_label": {
+            "key": container.type_label.key,
+            "value": container.type_label.value,
+        },
         "created_at": datetime.now().isoformat(),
-        "cpu_usage": "10",
-        "memory_usage": stats["storage_usage_percent"]
-        / (container.tariff.storage_quota * 1024)
-        * 100,
+        "cpu_usage": 10,
+        "memory_usage": memory_usage,
         "user_id": container.user_id,
-        "commands": container.commands,
+        "commands": container.commands or [],
         "privileged": container.privileged,
-        "storage_used": stats["total_size"],
-        "storage_usage_percent": stats["storage_usage_percent"],
+        "storage_used": storage_used,
+        "storage_usage_percent": storage_usage_percent,
     }
