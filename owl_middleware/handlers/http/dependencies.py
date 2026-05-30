@@ -78,7 +78,7 @@ async def get_container_stats(
     container_id: str,
 ) -> dict:
     stats_result = await container_service.get_container_stats(
-        str(user_id), container_id
+        str(user_id), str(container_id)
     )
     if stats_result.is_ok():
         stats = stats_result.unwrap()
