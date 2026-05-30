@@ -199,10 +199,10 @@ async def get_file_content(
         raise HTTPException(status_code=404, detail="Container not found")
 
     container = container_result.unwrap()
-    if (
-        container.user_id != str(current_user.tg_id)
-        and not current_user.role == UserRole.admin
-    ):
+    if container.user_id != str(current_user.tg_id) and current_user.role not in [
+        UserRole.admin,
+        UserRole.super_admin,
+    ]:
         raise HTTPException(status_code=403, detail="Access denied")
 
     content_result = await api_service.files.get_file_content(
