@@ -324,7 +324,6 @@ class AgentService:
             return {"status": "unhealthy", "error": str(e), "initialized": False}
 
     async def cleanup(self):
-        """Очистка ресурсов."""
         self._prompt_cache.clear()
         self._initialized = False
         self._prompt_engine = None

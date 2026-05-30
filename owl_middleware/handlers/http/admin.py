@@ -42,6 +42,7 @@ async def admin_login(
             "username": user.username or user.first_name,
             "email": user.email,
             "role": user.role,
+            "tg_id": user.tg_id,
             "permissions": getattr(
                 user, "permissions", auth_service._get_default_permissions(user.role)
             ),
@@ -91,21 +92,14 @@ async def list_all_users(
 ):
     current_user = await get_current_user_from_request(request, auth_service)
 
-    Logger.info("1")
     if current_user.role not in [UserRole.admin, UserRole.super_admin]:
         raise HTTPException(status_code=403, detail="Admin access required")
-
-    Logger.info("2")
 
     users_result = await auth_service.get_all_users()
     if users_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching users")
 
-    Logger.info("3")
-
     users = users_result.unwrap()
-
-    Logger.info("4")
 
     users_data = []
     for user in users:
@@ -119,8 +113,6 @@ async def list_all_users(
                 "is_active": user.is_active,
             }
         )
-
-    Logger.info("5")
 
     return {"data": users_data}
 
