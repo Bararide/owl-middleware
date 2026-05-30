@@ -109,7 +109,7 @@ async def list_all_users(
                 "name": user.username or user.first_name,
                 "email": user.email or "",
                 "role": user.role,
-                "tg_id": user.tg_id,
+                "tg_id": str(user.tg_id),
                 "is_active": user.is_active,
             }
         )
