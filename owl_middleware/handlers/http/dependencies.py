@@ -29,7 +29,6 @@ async def get_current_user_from_request(
 
 
 async def get_tg_id_from_user_id(auth_service: AuthService, user_id: str) -> int:
-    """Получить tg_id по user_id из БД"""
     try:
         user_result = await auth_service.get_user(int(user_id))
         if user_result.is_ok():
@@ -78,9 +77,9 @@ async def get_container_stats(
     user_id: str,
     container_id: str,
 ) -> dict:
-    tg_id = await get_tg_id_from_user_id(auth_service, user_id)
-
-    stats_result = await container_service.get_container_stats(str(tg_id), container_id)
+    stats_result = await container_service.get_container_stats(
+        str(user_id), container_id
+    )
     if stats_result.is_ok():
         stats = stats_result.unwrap()
         return {
@@ -91,7 +90,6 @@ async def get_container_stats(
 
 
 async def container_to_response(container: Container, stats: dict, status: str) -> dict:
-    """Convert container model to API response"""
     storage_quota_mb = container.tariff.storage_quota
     storage_used = stats.get("total_size", 0)
     storage_usage_percent = stats.get("storage_usage_percent", 0)

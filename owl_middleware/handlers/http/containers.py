@@ -46,6 +46,60 @@ async def list_containers(
     return {"data": containers_data}
 
 
+@router.get("/{container_id}/stats")
+@inject("container_service")
+@inject("auth_service")
+async def get_container_stats_endpoint(
+    container_id: str,
+    container_service: ContainerService,
+    auth_service: AuthService,
+    request: Request,
+):
+    current_user = await get_current_user_from_request(request, auth_service)
+
+    container_result = await container_service.get_container(container_id)
+    if container_result.is_err():
+        raise HTTPException(status_code=404, detail="Container not found")
+
+    container = container_result.unwrap()
+    if container.user_id != str(current_user.tg_id) and current_user.role not in [
+        UserRole.admin,
+        UserRole.super_admin,
+    ]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        maybe_stats = await container_service.get_container_metrics(container_id)
+        if maybe_stats.is_err():
+            raise HTTPException(status_code=500, detail="Error fetching stats")
+        stats = maybe_stats.unwrap()
+        return {
+            "data": {
+                "cpu_usage": stats.get("cpu", 0),
+                "memory_usage": stats.get("memory_bytes", 0),
+                "storage_used": stats.get("storage_bytes", 0),
+                "gpu_usage": stats.get("gpu", 0),
+                "network_in": stats.get("network_rx", 0),
+                "network_out": stats.get("network_tx", 0),
+                "timestamp": datetime.now().isoformat(),
+            }
+        }
+    except Exception as e:
+        Logger.error(f"Failed to fetch stats for {container_id}: {e}")
+        return {
+            "data": {
+                "cpu_usage": 0,
+                "memory_usage": 0,
+                "storage_used": 0,
+                "gpu_usage": 0,
+                "network_in": 0,
+                "network_out": 0,
+                "timestamp": datetime.now().isoformat(),
+                "warning": "Stats temporarily unavailable",
+            }
+        }
+
+
 @router.get("/admin/all")
 @inject("container_service")
 @inject("auth_service")
@@ -229,10 +283,10 @@ async def get_container(
 
     container = container_result.unwrap()
 
-    if (
-        container.user_id != str(current_user.tg_id)
-        and not current_user.role == UserRole.admin
-    ):
+    if container.user_id != str(current_user.tg_id) and current_user.role not in [
+        UserRole.admin,
+        UserRole.super_admin,
+    ]:
         raise HTTPException(status_code=403, detail="Access denied")
 
     return {"data": container.dict()}
