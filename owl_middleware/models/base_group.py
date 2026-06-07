@@ -8,3 +8,4 @@ class BaseGroup(BaseModel, ABC):
     id: str
     description: Optional[str] = None
     created_at: Optional[datetime] = None
+    color: str = "#ff9800"

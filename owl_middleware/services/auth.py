@@ -42,6 +42,83 @@ class AuthService:
         user = await self.users.find_one({"tg_id": tg_id})
         return User(**user) if user else None
 
+    async def update_user_role(
+        self, user_id: str, new_role: str
+    ) -> Result[User, Exception]:
+        try:
+            user = await self.users.find_one({"id": int(user_id)})
+            if not user:
+                user = (
+                    await self.users.find_one({"tg_id": int(user_id)})
+                    if user_id.isdigit()
+                    else None
+                )
+
+            if not user:
+                return Err(Exception("User not found"))
+
+            user["role"] = new_role
+            user["promoted_at"] = datetime.now().isoformat()
+
+            await self.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"role": new_role, "promoted_at": user["promoted_at"]}},
+            )
+
+            return Ok(User(**user))
+        except Exception as e:
+            return Err(e)
+
+    async def update_user_status(
+        self, user_id: str, is_active: bool
+    ) -> Result[User, Exception]:
+        try:
+            user = await self.users.find_one({"id": int(user_id)})
+            if not user:
+                user = (
+                    await self.users.find_one({"tg_id": int(user_id)})
+                    if user_id.isdigit()
+                    else None
+                )
+
+            if not user:
+                return Err(Exception("User not found"))
+
+            await self.users.update_one(
+                {"_id": user["_id"]}, {"$set": {"is_active": is_active}}
+            )
+
+            user["is_active"] = is_active
+            return Ok(User(**user))
+        except Exception as e:
+            return Err(e)
+
+    async def get_user_by_id(self, user_id: str) -> Result[User, Exception]:
+        try:
+            user = await self.users.find_one({"id": int(user_id)})
+            if not user:
+                user = (
+                    await self.users.find_one({"tg_id": int(user_id)})
+                    if user_id.isdigit()
+                    else None
+                )
+
+            if not user:
+                return Err(Exception("User not found"))
+
+            return Ok(User(**user))
+        except Exception as e:
+            return Err(e)
+
+    async def get_user_by_tg_id(self, tg_id: str) -> Result[User, Exception]:
+        try:
+            user = await self.users.find_one({"tg_id": int(tg_id)})
+            if not user:
+                return Err(Exception("User not found"))
+            return Ok(User(**user))
+        except Exception as e:
+            return Err(e)
+
     @result_try
     async def get_user_by_email(self, email: str) -> Result[User, Exception]:
         user = await self.users.find_one({"email": email})
