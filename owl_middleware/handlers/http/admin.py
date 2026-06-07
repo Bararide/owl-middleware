@@ -225,6 +225,49 @@ async def update_user_status(
     }
 
 
+def _extract_member_info(m: dict, auth_service_get_user=None) -> dict:
+    user_id = str(m.get("user_id", ""))
+    role = m.get("role", "member")
+    if hasattr(role, "value"):
+        role = role.value
+
+    user_name = user_id
+    user_email = ""
+
+    if auth_service_get_user:
+        try:
+            user_result = auth_service_get_user(user_id)
+            if hasattr(user_result, "is_ok") and user_result.is_ok():
+                user = user_result.unwrap()
+                user_name = user.username or user.first_name or user_id
+                user_email = user.email or ""
+        except Exception:
+            pass
+
+    return {
+        "user_id": user_id,
+        "user_name": m.get("user_name", user_name),
+        "user_email": user_email,
+        "role": role,
+        "joined_at": m.get("joined_at"),
+    }
+
+
+def _extract_container_access_info(c: dict) -> dict:
+    container_id = c.get("container_id", "")
+    if not container_id:
+        container_id = c.get("id", "")
+
+    permission = c.get("permission", "read_write")
+    if hasattr(permission, "value"):
+        permission = permission.value
+
+    return {
+        "container_id": str(container_id),
+        "permission": str(permission),
+    }
+
+
 @router.get("/groups")
 @inject("auth_service")
 @inject("user_group_service")
@@ -247,10 +290,48 @@ async def list_user_groups(
 
     for group in groups:
         members_result = await user_group_service.get_group_members(group.id)
-        members = members_result.unwrap() if members_result.is_ok() else []
+        raw_members = members_result.unwrap() if members_result.is_ok() else []
 
         containers_result = await user_group_service.get_group_containers(group)
-        containers = containers_result.unwrap() if containers_result.is_ok() else []
+        raw_containers = containers_result.unwrap() if containers_result.is_ok() else []
+
+        members_data = []
+        for m in raw_members:
+            user_id = str(m.get("user_id", ""))
+            role = m.get("role", "member")
+            if hasattr(role, "value"):
+                role = role.value
+
+            user_name = user_id
+            try:
+                user_result = await auth_service.get_user_by_id(user_id)
+                if user_result.is_ok():
+                    u = user_result.unwrap()
+                    user_name = u.username or u.first_name or user_id
+            except Exception:
+                pass
+
+            members_data.append(
+                {
+                    "user_id": user_id,
+                    "user_name": m.get("user_name", user_name),
+                    "role": role,
+                }
+            )
+
+        containers_data = []
+        for c in raw_containers:
+            container_id = c.get("container_id", c.get("id", ""))
+            permission = c.get("permission", "read_write")
+            if hasattr(permission, "value"):
+                permission = permission.value
+
+            containers_data.append(
+                {
+                    "container_id": str(container_id),
+                    "permission": str(permission),
+                }
+            )
 
         groups_data.append(
             {
@@ -259,34 +340,8 @@ async def list_user_groups(
                 "description": group.description,
                 "color": getattr(group, "color", "#ff9800"),
                 "created_at": str(group.created_at) if group.created_at else None,
-                "members": [
-                    {
-                        "user_id": str(m.user_id),
-                        "user_name": (
-                            m.user_name if hasattr(m, "user_name") else str(m.user_id)
-                        ),
-                        "role": (
-                            m.role.value if hasattr(m.role, "value") else str(m.role)
-                        ),
-                    }
-                    for m in members
-                ],
-                "containers": [
-                    {
-                        "container_id": (
-                            str(c.container_id)
-                            if hasattr(c, "container_id")
-                            else str(c.id)
-                        ),
-                        "permission": (
-                            c.permission.value
-                            if hasattr(c, "permission")
-                            and hasattr(c.permission, "value")
-                            else str(getattr(c, "permission", "read_write"))
-                        ),
-                    }
-                    for c in containers
-                ],
+                "members": members_data,
+                "containers": containers_data,
             }
         )
 
@@ -378,10 +433,48 @@ async def update_user_group(
     updated_group = update_result.unwrap()
 
     members_result = await user_group_service.get_group_members(group_id)
-    members = members_result.unwrap() if members_result.is_ok() else []
+    raw_members = members_result.unwrap() if members_result.is_ok() else []
 
     containers_result = await user_group_service.get_group_containers(updated_group)
-    containers = containers_result.unwrap() if containers_result.is_ok() else []
+    raw_containers = containers_result.unwrap() if containers_result.is_ok() else []
+
+    members_data = []
+    for m in raw_members:
+        user_id = str(m.get("user_id", ""))
+        role = m.get("role", "member")
+        if hasattr(role, "value"):
+            role = role.value
+
+        user_name = user_id
+        try:
+            user_result = await auth_service.get_user_by_id(user_id)
+            if user_result.is_ok():
+                u = user_result.unwrap()
+                user_name = u.username or u.first_name or user_id
+        except Exception:
+            pass
+
+        members_data.append(
+            {
+                "user_id": user_id,
+                "user_name": m.get("user_name", user_name),
+                "role": role,
+            }
+        )
+
+    containers_data = []
+    for c in raw_containers:
+        container_id = c.get("container_id", c.get("id", ""))
+        permission = c.get("permission", "read_write")
+        if hasattr(permission, "value"):
+            permission = permission.value
+
+        containers_data.append(
+            {
+                "container_id": str(container_id),
+                "permission": str(permission),
+            }
+        )
 
     return {
         "data": {
@@ -392,29 +485,8 @@ async def update_user_group(
             "created_at": (
                 str(updated_group.created_at) if updated_group.created_at else None
             ),
-            "members": [
-                {
-                    "user_id": str(m.user_id),
-                    "user_name": (
-                        m.user_name if hasattr(m, "user_name") else str(m.user_id)
-                    ),
-                    "role": m.role.value if hasattr(m.role, "value") else str(m.role),
-                }
-                for m in members
-            ],
-            "containers": [
-                {
-                    "container_id": (
-                        str(c.container_id) if hasattr(c, "container_id") else str(c.id)
-                    ),
-                    "permission": (
-                        c.permission.value
-                        if hasattr(c, "permission") and hasattr(c.permission, "value")
-                        else str(getattr(c, "permission", "read_write"))
-                    ),
-                }
-                for c in containers
-            ],
+            "members": members_data,
+            "containers": containers_data,
         }
     }
 
@@ -464,30 +536,34 @@ async def get_group_members(
     if members_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching members")
 
-    members = members_result.unwrap()
+    raw_members = members_result.unwrap()
     members_data = []
 
-    for member in members:
-        user_result = await auth_service.get_user_by_id(str(member.user_id))
-        user = user_result.unwrap() if user_result.is_ok() else None
+    for member in raw_members:
+        user_id = str(member.get("user_id", ""))
+        role = member.get("role", "member")
+        if hasattr(role, "value"):
+            role = role.value
+
+        user_name = user_id
+        user_email = ""
+
+        try:
+            user_result = await auth_service.get_user_by_id(user_id)
+            if user_result.is_ok():
+                user = user_result.unwrap()
+                user_name = user.username or user.first_name or user_id
+                user_email = user.email or ""
+        except Exception:
+            pass
 
         members_data.append(
             {
-                "user_id": str(member.user_id),
-                "user_name": (
-                    (user.username or user.first_name) if user else str(member.user_id)
-                ),
-                "user_email": user.email if user else "",
-                "role": (
-                    member.role.value
-                    if hasattr(member.role, "value")
-                    else str(member.role)
-                ),
-                "joined_at": (
-                    str(member.joined_at)
-                    if hasattr(member, "joined_at") and member.joined_at
-                    else None
-                ),
+                "user_id": user_id,
+                "user_name": user_name,
+                "user_email": user_email,
+                "role": role,
+                "joined_at": member.get("joined_at"),
             }
         )
 
@@ -635,21 +711,23 @@ async def get_container_accesses(
     if accesses_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching accesses")
 
-    accesses = accesses_result.unwrap()
-    return {
-        "data": [
+    raw_accesses = accesses_result.unwrap()
+
+    accesses_data = []
+    for a in raw_accesses:
+        permission = a.get("permission", "read_write")
+        if hasattr(permission, "value"):
+            permission = permission.value
+
+        accesses_data.append(
             {
-                "container_id": a.container_id,
-                "group_id": a.group_id,
-                "permission": (
-                    a.permission.value
-                    if hasattr(a.permission, "value")
-                    else str(a.permission)
-                ),
+                "container_id": str(a.get("container_id", container_id)),
+                "group_id": str(a.get("group_id", "")),
+                "permission": str(permission),
             }
-            for a in accesses
-        ]
-    }
+        )
+
+    return {"data": accesses_data}
 
 
 @router.post("/containers/{container_id}/access")
