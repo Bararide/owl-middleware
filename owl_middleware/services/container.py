@@ -49,7 +49,8 @@ class ContainerService:
     async def get_container_metrics(
         self, container_id: str
     ) -> Result[Dict[str, Any], Exception]:
-        # metrics = await self.api_service.get_container_metrics(container_id)
+        metrics = await self.api_service.get_container_metrics(container_id)
+        Logger.debug(f"Metrics for container {container_id}: {metrics}")
         return {}
 
     @result_try
