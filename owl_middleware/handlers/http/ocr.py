@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 @inject("auth_service")
 @inject("ocr_service")
 async def process_ocr(
-    request: dict,
-    req: Request,
+    request: Request,
     api_service: ApiService,
     container_service: ContainerService,
     auth_service: AuthService,
