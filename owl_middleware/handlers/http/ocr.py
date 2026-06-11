@@ -26,10 +26,15 @@ async def process_ocr(
 ):
     current_user = await get_current_user_from_request(request, auth_service)
 
-    container_id = request.get("container_id")
-    file_data_base64 = request.get("file_data")
-    file_name = request.get("file_name")
-    mime_type = request.get("mime_type", "image/jpeg")
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    container_id = body.get("container_id")
+    file_data_base64 = body.get("file_data")
+    file_name = body.get("file_name")
+    mime_type = body.get("mime_type", "image/jpeg")
 
     if not container_id:
         raise HTTPException(status_code=400, detail="Container ID is required")
@@ -78,7 +83,8 @@ async def process_ocr(
             visualized_data = ocr_service.draw_bounding_boxes(file_data, extracted_text)
             boxes = ocr_service.parse_bounding_boxes(extracted_text)
             boxes_count = len(boxes)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to create visualization: {e}")
             visualized_data = None
 
     result_file_name = f"ocr_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_name.split('.')[0]}.txt"
