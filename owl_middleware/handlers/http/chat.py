@@ -17,21 +17,22 @@ logger = logging.getLogger(__name__)
 @inject("agent_service")
 @inject("deepseek_agent_service")
 async def chat_with_bot(
-    request: dict,
-    req: Request,
+    request: Request,
     api_service: ApiService,
     container_service: ContainerService,
     auth_service: AuthService,
     agent_service: AgentService,
     deepseek_agent_service: AgentService,
 ):
+    body = await request.json()
+
     current_user = await get_current_user_from_request(request, auth_service)
 
-    query = request.get("query", "").strip()
-    container_id = request.get("container_id")
-    conversation_history = request.get("conversation_history", [])
-    model = request.get("model", 0)
-    limit = request.get("limit", 5)
+    query = body.get("query", "").strip()
+    container_id = body.get("container_id")
+    conversation_history = body.get("conversation_history", [])
+    model = body.get("model", 0)
+    limit = body.get("limit", 5)
 
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
@@ -100,23 +101,20 @@ User question: {query}
 
 Analyze the file contents and provide a helpful response."""
 
-    chat_result = match(
-        model,
-        0,
-        await agent_service.chat(
+    if model == 0:
+        chat_result = await agent_service.chat(
             message=query,
             conversation_history=conversation_history,
             user=current_user,
             system_prompt=system_prompt,
-        ),
-        1,
-        await deepseek_agent_service.chat(
+        )
+    else:
+        chat_result = await deepseek_agent_service.chat(
             message=query,
             conversation_history=conversation_history,
             user=current_user,
             system_prompt=system_prompt,
-        ),
-    )
+        )
 
     if chat_result.is_err():
         error_msg = str(chat_result.unwrap_err())
