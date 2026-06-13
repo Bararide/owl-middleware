@@ -69,7 +69,9 @@ async def get_container_stats_endpoint(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
-        maybe_stats = await container_service.get_container_metrics(container_id)
+        maybe_stats = await container_service.get_container_metrics(
+            current_user, container
+        )
         if maybe_stats.is_err():
             raise HTTPException(status_code=500, detail="Error fetching stats")
         stats = maybe_stats.unwrap()
@@ -340,7 +342,9 @@ async def get_container_metrics(
     ):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    metrics_result = await api_service.get_container_metrics(container_id)
+    metrics_result = await api_service.containers.get_container_metrics(
+        current_user, container
+    )
     if metrics_result.is_err():
         raise HTTPException(status_code=500, detail="Error fetching metrics")
 
@@ -360,7 +364,7 @@ async def get_containers_status(
 ):
     current_user = await get_current_user_from_request(request, auth_service)
 
-    containers_result = await container_service.get_containers_by_user_id(
+    containers_result = await container_service.containers.get_containers_by_user_id(
         str(current_user.tg_id)
     )
 
